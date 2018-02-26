@@ -79,11 +79,13 @@ func (b *buffered) Send() {
 			Name:       fmt.Sprintf("projects/%s", b.project),
 			TimeSeries: merged,
 		})
-
+	b.l.Infof("Herehere project ID is %v", b.project)
 	// TODO: this is executed in a daemon, so we can't get out info about errors other than logging.
 	// We need to build framework level support for these kinds of async tasks. Perhaps a generic batching adapter
 	// can handle some of this complexity?
 	if err != nil {
+		b.l.Infof("Herehere2 error is %v", err)
+		b.l.Infof("Herehere3 error is %v", merged)
 		_ = b.l.Errorf("Stackdriver returned: %v\nGiven data: %v", err, merged)
 	} else {
 		b.l.Infof("Successfully sent data to Stackdriver.")
