@@ -17,6 +17,7 @@ package metric
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -78,7 +79,7 @@ type (
 
 const (
 	// From https://github.com/GoogleCloudPlatform/golang-samples/blob/master/monitoring/custommetric/custommetric.go
-	customMetricPrefix = "custom.googleapis.com/"
+	customMetricPrefix = "istio.io/service/"
 )
 
 var (
@@ -265,5 +266,14 @@ func toTypedVal(val interface{}, i info) *monitoringpb.TypedValue {
 
 func metricType(name string) string {
 	// TODO: figure out what, if anything, we need to do to sanitize these.
-	return customMetricPrefix + name
+	m := strings.Split(name, ".")[0]
+	sp := strings.Split(m, "-")
+	ret := customMetricPrefix + sp[0] + "/"
+	for i := 1; i < len(sp); i++ {
+		ret += sp[i]
+		if i+1 != len(sp) {
+			ret += "_"
+		}
+	}
+	return ret
 }

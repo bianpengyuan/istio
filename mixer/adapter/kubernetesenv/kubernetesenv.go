@@ -187,11 +187,11 @@ func (h *handler) GenerateKubernetesAttributes(ctx context.Context, inst *ktmpl.
 	out := ktmpl.NewOutput()
 	if inst.DestinationUid != "" {
 		if p, found := h.findPod(inst.DestinationUid); found {
-			h.fillDestinationAttrs(p, out, h.params)
+			h.fillDestinationAttrs(p, inst.DestinationPort, out, h.params)
 		}
 	} else if inst.DestinationIp != nil && !inst.DestinationIp.IsUnspecified() {
 		if p, found := h.findPod(inst.DestinationIp.String()); found {
-			h.fillDestinationAttrs(p, out, h.params)
+			h.fillDestinationAttrs(p, inst.DestinationPort, out, h.params)
 		}
 	}
 
@@ -334,7 +334,7 @@ func (h *handler) fillOriginAttrs(p *v1.Pod, o *ktmpl.Output, params *config.Par
 	}
 }
 
-func (h *handler) fillDestinationAttrs(p *v1.Pod, o *ktmpl.Output, params *config.Params) {
+func (h *handler) fillDestinationAttrs(p *v1.Pod, port int64, o *ktmpl.Output, params *config.Params) {
 	if len(p.Labels) > 0 {
 		o.SetDestinationLabels(p.Labels)
 	}
@@ -366,6 +366,21 @@ func (h *handler) fillDestinationAttrs(p *v1.Pod, o *ktmpl.Output, params *confi
 			o.SetDestinationService(n)
 		} else {
 			h.env.Logger().Warningf("DestinationService not set: %v", err)
+		}
+	}
+	if port >= 0 {
+		for _, c := range p.Spec.Containers {
+			f := false
+			for _, cp := range c.Ports {
+				if cp.ContainerPort == int32(port) {
+					o.SetDestinationContainerName(c.Name)
+					f = true
+					break
+				}
+			}
+			if f {
+				break
+			}
 		}
 	}
 }

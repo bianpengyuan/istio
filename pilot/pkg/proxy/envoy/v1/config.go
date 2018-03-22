@@ -603,6 +603,13 @@ func buildDestinationHTTPRoutes(node model.Proxy, service *model.Service,
 			httpRoutes := BuildHTTPRoutes(config, rule, service, servicePort, proxyInstances, node.Domain, buildCluster)
 			routes = append(routes, httpRoutes...)
 
+			for _, httpRoute := range httpRoutes {
+				if strings.HasPrefix(service.Hostname, "istio-pilot") || strings.HasPrefix(service.Hostname, "istio-mixer") || strings.HasPrefix(service.Hostname, "default") {
+					continue
+				}
+				httpRoute.OpaqueConfig = BuildMixerConfig(node, service.Hostname, service, proxyInstances, config, true, false)
+			}
+
 			// User can provide timeout/retry policies without any match condition,
 			// or specific route. User could also provide a single default route, in
 			// which case, we should not be generating another default route.
@@ -625,7 +632,11 @@ func buildDestinationHTTPRoutes(node model.Proxy, service *model.Service,
 		if useDefaultRoute {
 			// default route for the destination is always the lowest priority route
 			cluster := buildCluster(service.Hostname, servicePort, nil, service.External())
-			routes = append(routes, BuildDefaultRoute(cluster))
+			defaultRoute := BuildDefaultRoute(cluster)
+			if !strings.HasPrefix(service.Hostname, "istio-pilot") && !strings.HasPrefix(service.Hostname, "istio-mixer") && !strings.HasPrefix(service.Hostname, "default") {
+				defaultRoute.OpaqueConfig = BuildMixerConfig(node, service.Hostname, service, proxyInstances, config, true, false)
+			}
+			routes = append(routes, defaultRoute)
 		}
 
 		return routes

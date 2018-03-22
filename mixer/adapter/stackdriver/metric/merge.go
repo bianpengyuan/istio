@@ -52,7 +52,7 @@ func groupBySeries(series []*monitoring.TimeSeries) map[uint64][]*monitoring.Tim
 				}
 				// Stackdriver doesn't allow DELTA custom metrics, but queries over CUMULATIVE data without overlapping time
 				// intervals have the same semantics as DELTA metrics. So we change DELTAs to CUMULATIVE to get through the API front door.
-				ts.MetricKind = metricpb.MetricDescriptor_CUMULATIVE
+				// ts.MetricKind = metricpb.MetricDescriptor_CUMULATIVE
 			}
 		}
 		k := toKey(ts.Metric, ts.Resource)

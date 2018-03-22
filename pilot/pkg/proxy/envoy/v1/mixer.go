@@ -182,6 +182,10 @@ func BuildMixerConfig(source model.Proxy, destName string, dest *model.Service, 
 
 	addStandardNodeAttributes(sc.MixerAttributes.Attributes, AttrDestinationPrefix, "", destName, nil)
 
+	sc.MixerAttributes.Attributes["request.role"] = &mpb.Attributes_AttributeValue{
+		Value: &mpb.Attributes_AttributeValue_StringValue{"client"},
+	}
+
 	oc := map[string]string{
 		AttrDestinationService: destName,
 	}
@@ -242,6 +246,10 @@ func BuildHTTPMixerFilterConfig(mesh *meshconfig.MeshConfig, role model.Proxy, n
 		// for outboundRoutes there are no default MixerAttributes
 		// specific MixerAttributes are in per route configuration.
 		addStandardNodeAttributes(v2.MixerAttributes.Attributes, AttrDestinationPrefix, role.IPAddress, role.ID, labels)
+	}
+
+	v2.MixerAttributes.Attributes["request.role"] = &mpb.Attributes_AttributeValue{
+		Value: &mpb.Attributes_AttributeValue_StringValue{"server"},
 	}
 
 	if role.Type == model.Sidecar && !outboundRoute {
@@ -366,6 +374,7 @@ func BuildTCPMixerFilterConfig(mesh *meshconfig.MeshConfig, role model.Proxy, in
 
 	attrs := standardNodeAttributes(AttrDestinationPrefix, role.IPAddress, role.ID, nil)
 	attrs[AttrDestinationService] = &mpb.Attributes_AttributeValue{Value: &mpb.Attributes_AttributeValue_StringValue{instance.Service.Hostname}}
+	attrs["request.role"] = &mpb.Attributes_AttributeValue{Value: &mpb.Attributes_AttributeValue_StringValue{"server"}}
 
 	v2 := &mccpb.TcpClientConfig{
 		MixerAttributes: &mpb.Attributes{
