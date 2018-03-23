@@ -751,6 +751,12 @@ func buildOutboundTCPListeners(mesh *meshconfig.MeshConfig, node model.Proxy,
 					if node.Type == model.Router {
 						listener.BindToPort = true
 					}
+					filter := &NetworkFilter{
+						Type:   both,
+						Name:   MixerFilter,
+						Config: BuildTCPOutboundMixerFilterConfig(node, service.Hostname),
+					}
+					listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 					tcpListeners = append(tcpListeners, listener)
 				} else {
 					cluster := BuildOutboundCluster(service.Hostname, servicePort, nil, service.External())
@@ -758,6 +764,12 @@ func buildOutboundTCPListeners(mesh *meshconfig.MeshConfig, node model.Proxy,
 					config := &TCPRouteConfig{Routes: []*TCPRoute{route}}
 					listener := buildTCPListener(
 						config, service.Address, servicePort.Port, servicePort.Protocol)
+					filter := &NetworkFilter{
+						Type:   both,
+						Name:   MixerFilter,
+						Config: BuildTCPOutboundMixerFilterConfig(node, service.Hostname),
+					}
+					listener.Filters = append([]*NetworkFilter{filter}, listener.Filters...)
 					tcpClusters = append(tcpClusters, cluster)
 					tcpListeners = append(tcpListeners, listener)
 				}

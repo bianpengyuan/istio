@@ -396,6 +396,40 @@ func BuildTCPMixerFilterConfig(mesh *meshconfig.MeshConfig, role model.Proxy, in
 	return filter
 }
 
+func BuildTCPOutboundMixerFilterConfig(role model.Proxy, destinationHostName string) *FilterMixerConfig {
+	transport := &mccpb.TransportConfig{
+		CheckCluster:  MixerCheckClusterName,
+		ReportCluster: MixerReportClusterName,
+	}
+
+	v2 := &mccpb.TcpClientConfig{
+		MixerAttributes: &mpb.Attributes{
+			Attributes: map[string]*mpb.Attributes_AttributeValue{},
+		},
+		Transport:         transport,
+		DisableCheckCalls: true,
+	}
+
+	filter := &FilterMixerConfig{}
+
+	var labels map[string]string
+
+	addStandardNodeAttributes(v2.MixerAttributes.Attributes, AttrSourcePrefix, role.IPAddress, role.ID, labels)
+	v2.MixerAttributes.Attributes["request.role"] = &mpb.Attributes_AttributeValue{
+		Value: &mpb.Attributes_AttributeValue_StringValue{"client"},
+	}
+	v2.MixerAttributes.Attributes["destination.service"] = &mpb.Attributes_AttributeValue{
+		Value: &mpb.Attributes_AttributeValue_StringValue{destinationHostName},
+	}
+
+	if v2JSONMap, err := model.ToJSONMap(v2); err != nil {
+		log.Warnf("Could not encode v2 TCP mixerclient filter for node %q: %v", role, err)
+	} else {
+		filter.V2 = v2JSONMap
+	}
+	return filter
+}
+
 const (
 	// OutboundJWTURIClusterPrefix is the prefix for jwt_uri service
 	// clusters external to the proxy instance
