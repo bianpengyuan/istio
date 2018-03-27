@@ -579,6 +579,33 @@ func TestEgressCheckCache(t *testing.T) {
 	testCheckCache(t, visit)
 }
 
+// TestEgressCheckCache tests that check cache works on egress traffic.
+func TestEgressCheckCache(t *testing.T) {
+	t.Logf("apply egress rule to enable traffic to httpbin.org")
+	if err := applyEgressRule(); err != nil {
+		fatalf(t, "could not apply egress rule: %v", err)
+	}
+	defer func() {
+		if err := deleteEgressRule(); err != nil {
+			t.Logf("could not clear egress rule: %v", err)
+		}
+	}()
+	allowRuleSync()
+
+	// Get pod id of sleep app.
+	pod, err := podID("app=sleep")
+	if err != nil {
+		fatalf(t, "fail getting pod id of sleep %v", err)
+	}
+	url := fmt.Sprintf("http://httpbin.org/status/200")
+
+	visit := func() error {
+		// httpbin is an external dependency, to avoid flake, no return code is required.
+		return visitWithApp(url, pod, "sleep", "")
+	}
+	testCheckCache(t, visit)
+}
+
 // testCheckCache verifies check cache is used when calling the given visit function
 // by comparing the check call metric.
 func testCheckCache(t *testing.T, visit func() error) {
