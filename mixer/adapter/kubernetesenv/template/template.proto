@@ -59,6 +59,7 @@ option (istio.mixer.adapter.model.v1beta1.template_variety) = TEMPLATE_VARIETY_A
 //     destination.service: $out.destination_service
 //     destination.serviceAccount: $out.destination_service_account_name
 // ```
+// Next ID: 8
 message Template {
     // Source pod's uid. Must be of the form: "kubernetes://pod.namespace"
     string source_uid = 1;
@@ -84,6 +85,7 @@ message Template {
 
 // OutputTemplate refers to the output from the adapter. It is used inside the attribute_binding section of the config
 // to assign values to the generated attributes using the `$out.<field name of the OutputTemplate>` syntax.
+// Next ID: 23
 message OutputTemplate {
     // Refers to source pod ip address. attribute_bindings can refer to this field using $out.source_pod_ip
     istio.mixer.adapter.model.v1beta1.IPAddress source_pod_ip = 1;

@@ -52,6 +52,7 @@ syntax = "proto3";
 //     destination.service: $out.destination_service
 //     destination.serviceAccount: $out.destination_service_account_name
 // ```
+// Next ID: 8
 package adapter.template.kubernetes;
 
 

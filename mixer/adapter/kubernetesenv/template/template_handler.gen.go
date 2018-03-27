@@ -63,6 +63,7 @@ const TemplateName = "kubernetes"
 //     destination.service: $out.destination_service
 //     destination.serviceAccount: $out.destination_service_account_name
 // ```
+// Next ID: 8
 type Instance struct {
 	// Name of the instance as specified in configuration.
 	Name string
@@ -93,6 +94,7 @@ type Instance struct {
 //
 // OutputTemplate refers to the output from the adapter. It is used inside the attribute_binding section of the config
 // to assign values to the generated attributes using the `$out.<field name of the OutputTemplate>` syntax.
+// Next ID: 23
 type Output struct {
 	fieldsSet map[string]bool
 

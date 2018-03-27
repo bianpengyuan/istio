@@ -39,6 +39,7 @@
 	    destination.service: $out.destination_service
 	    destination.serviceAccount: $out.destination_service_account_name
 	```
+	Next ID: 8
 
 	It is generated from these files:
 		mixer/adapter/kubernetesenv/template/template_handler_service.proto
