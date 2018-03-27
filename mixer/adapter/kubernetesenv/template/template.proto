@@ -72,6 +72,9 @@ message Template {
     // Destination pod's ip.
     istio.mixer.adapter.model.v1beta1.IPAddress destination_ip = 4;
 
+    // Destination container's port number.
+    int64 destination_port = 7;
+
     // Origin pod's uid. Must be of the form: "kubernetes://pod.namespace"
     string origin_uid = 5;
 
@@ -110,6 +113,9 @@ message OutputTemplate {
 
     // Refers to destination pod name. attribute_bindings can refer to this field using $out.destination_pod_name
     string destination_pod_name = 9;
+
+    // Refers to destination container name. attribute_bindings can refer to this field using $out.destination_container_name
+    string destination_container_name = 22;
 
     // Refers to destination pod labels. attribute_bindings can refer to this field using $out.destination_labels
     map<string, string> destination_labels = 10;

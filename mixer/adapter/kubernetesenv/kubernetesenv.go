@@ -187,11 +187,11 @@ func (h *handler) GenerateKubernetesAttributes(ctx context.Context, inst *ktmpl.
 	out := ktmpl.NewOutput()
 	if inst.DestinationUid != "" {
 		if p, found := h.findPod(inst.DestinationUid); found {
-			h.fillDestinationAttrs(p, out, h.params)
+			h.fillDestinationAttrs(p, inst.DestinationPort, out, h.params)
 		}
 	} else if inst.DestinationIp != nil && !inst.DestinationIp.IsUnspecified() {
 		if p, found := h.findPod(inst.DestinationIp.String()); found {
-			h.fillDestinationAttrs(p, out, h.params)
+			h.fillDestinationAttrs(p, inst.DestinationPort, out, h.params)
 		}
 	}
 
@@ -298,6 +298,20 @@ func keyFromUID(uid string) string {
 	return fullname
 }
 
+func findContainer(p *v1.Pod, port int64) (string, bool) {
+	if port <= 0 {
+		return "", false
+	}
+	for _, c := range p.Spec.Containers {
+		for _, cp := range c.Ports {
+			if int64(cp.ContainerPort) == port {
+				return c.Name, true
+			}
+		}
+	}
+	return "", false
+}
+
 func (h *handler) fillOriginAttrs(p *v1.Pod, o *ktmpl.Output, params *config.Params) {
 	if len(p.Labels) > 0 {
 		o.SetOriginLabels(p.Labels)
@@ -334,7 +348,7 @@ func (h *handler) fillOriginAttrs(p *v1.Pod, o *ktmpl.Output, params *config.Par
 	}
 }
 
-func (h *handler) fillDestinationAttrs(p *v1.Pod, o *ktmpl.Output, params *config.Params) {
+func (h *handler) fillDestinationAttrs(p *v1.Pod, port int64, o *ktmpl.Output, params *config.Params) {
 	if len(p.Labels) > 0 {
 		o.SetDestinationLabels(p.Labels)
 	}
@@ -352,6 +366,9 @@ func (h *handler) fillDestinationAttrs(p *v1.Pod, o *ktmpl.Output, params *confi
 	}
 	if len(p.Status.HostIP) > 0 {
 		o.SetDestinationHostIp(net.ParseIP(p.Status.HostIP))
+	}
+	if cn, found := findContainer(p, port); found {
+		o.SetDestinationContainerName(cn)
 	}
 	if app, found := p.Labels[params.PodLabelForService]; found {
 		n, err := canonicalName(app, p.Namespace, params.ClusterDomainName)

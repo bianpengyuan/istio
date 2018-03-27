@@ -83,6 +83,9 @@ message InstanceParam {
     // Destination pod's ip.
     string destination_ip = 4;
     
+    // Destination container's port number.
+    string destination_port = 7;
+    
     // Origin pod's uid. Must be of the form: "kubernetes://pod.namespace"
     string origin_uid = 5;
     

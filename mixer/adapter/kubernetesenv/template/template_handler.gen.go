@@ -79,6 +79,9 @@ type Instance struct {
 	// Destination pod's ip.
 	DestinationIp net.IP
 
+	// Destination container's port number.
+	DestinationPort int64
+
 	// Origin pod's uid. Must be of the form: "kubernetes://pod.namespace"
 	OriginUid string
 
@@ -119,6 +122,9 @@ type Output struct {
 
 	// Refers to destination pod name. attribute_bindings can refer to this field using $out.destination_pod_name
 	DestinationPodName string
+
+	// Refers to destination container name. attribute_bindings can refer to this field using $out.destination_container_name
+	DestinationContainerName string
 
 	// Refers to destination pod labels. attribute_bindings can refer to this field using $out.destination_labels
 	DestinationLabels map[string]string
@@ -204,6 +210,11 @@ func (o *Output) SetDestinationPodIp(val net.IP) {
 func (o *Output) SetDestinationPodName(val string) {
 	o.fieldsSet["destination_pod_name"] = true
 	o.DestinationPodName = val
+}
+
+func (o *Output) SetDestinationContainerName(val string) {
+	o.fieldsSet["destination_container_name"] = true
+	o.DestinationContainerName = val
 }
 
 func (o *Output) SetDestinationLabels(val map[string]string) {

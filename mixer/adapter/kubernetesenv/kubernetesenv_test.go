@@ -214,6 +214,19 @@ func TestKubegen_Generate(t *testing.T) {
 		"istio-system/ingress": {ObjectMeta: metav1.ObjectMeta{Name: "ingress", Namespace: "istio-system", Labels: map[string]string{"istio": "ingress"}}},
 		"istio-system/mixer":   {ObjectMeta: metav1.ObjectMeta{Name: "mixer", Namespace: "istio-system", Labels: map[string]string{"istio": "istio-mixer"}}},
 		"testns/ipApp":         {ObjectMeta: metav1.ObjectMeta{Name: "ipApp", Namespace: "testns", Labels: map[string]string{"app": "10.1.10.1"}}},
+		"testns/dest-container": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dest-container",
+				Namespace: "testns",
+				Labels:    map[string]string{"app": "dest-container.testns.svc.cluster"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "container1", Ports: []v1.ContainerPort{{ContainerPort: 123}, {ContainerPort: 234}}},
+					{Name: "container2", Ports: []v1.ContainerPort{{ContainerPort: 80}}},
+				},
+			},
+		},
 	}
 
 	sourceUIDIn := &kubernetes_apa_tmpl.Instance{
@@ -334,6 +347,33 @@ func TestKubegen_Generate(t *testing.T) {
 	mixerOut.SetSourceNamespace("istio-system")
 	mixerOut.SetSourcePodName("mixer")
 
+	destContainerIn := &kubernetes_apa_tmpl.Instance{
+		DestinationUid:  "kubernetes://dest-container.testns",
+		DestinationPort: 234,
+	}
+
+	destContainerOut := kubernetes_apa_tmpl.NewOutput()
+	destContainerOut.SetDestinationLabels(map[string]string{
+		"app": "dest-container.testns.svc.cluster",
+	})
+	destContainerOut.SetDestinationService("dest-container.testns.svc.cluster.local")
+	destContainerOut.SetDestinationNamespace("testns")
+	destContainerOut.SetDestinationPodName("dest-container")
+	destContainerOut.SetDestinationContainerName("container1")
+
+	badDestContainerIn := &kubernetes_apa_tmpl.Instance{
+		DestinationUid:  "kubernetes://dest-container.testns",
+		DestinationPort: 8080,
+	}
+
+	badDestContainerOut := kubernetes_apa_tmpl.NewOutput()
+	badDestContainerOut.SetDestinationLabels(map[string]string{
+		"app": "dest-container.testns.svc.cluster",
+	})
+	badDestContainerOut.SetDestinationService("dest-container.testns.svc.cluster.local")
+	badDestContainerOut.SetDestinationNamespace("testns")
+	badDestContainerOut.SetDestinationPodName("dest-container")
+
 	confWithIngressLookups := *conf
 	confWithIngressLookups.LookupIngressSourceAndOriginValues = true
 
@@ -354,6 +394,8 @@ func TestKubegen_Generate(t *testing.T) {
 		{"istio ingress service (lookup source)", istioDestinationSvcIn, istioDestinationWithSrcOut, &confWithIngressLookups},
 		{"ip app", ipAppSvcIn, ipAppDestinationOut, conf},
 		{"istio component label", mixerIn, mixerOut, conf},
+		{"destination container", destContainerIn, destContainerOut, conf},
+		{"bad destination container", badDestContainerIn, badDestContainerOut, conf},
 	}
 
 	objs := make([]runtime.Object, 0, len(pods))

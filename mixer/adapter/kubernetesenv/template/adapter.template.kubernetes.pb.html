@@ -94,6 +94,14 @@ to assign values to the generated attributes using the <code>$out.&lt;field name
 
 </td>
 </tr>
+<tr id="OutputTemplate.destination_container_name">
+<td><code>destinationContainerName</code></td>
+<td><code>string</code></td>
+<td>
+<p>Refers to destination container name. attribute<em>bindings can refer to this field using $out.destination</em>container_name</p>
+
+</td>
+</tr>
 <tr id="OutputTemplate.destination_labels">
 <td><code>destinationLabels</code></td>
 <td><code>map&lt;string,&nbsp;string&gt;</code></td>
@@ -266,6 +274,14 @@ spec:
 <td><code><a href="#istio.mixer.adapter.model.v1beta1.IPAddress">istio.mixer.adapter.model.v1beta1.IPAddress</a></code></td>
 <td>
 <p>Destination pod&rsquo;s ip.</p>
+
+</td>
+</tr>
+<tr id="Template.destination_port">
+<td><code>destinationPort</code></td>
+<td><code>int64</code></td>
+<td>
+<p>Destination container&rsquo;s port number.</p>
 
 </td>
 </tr>
