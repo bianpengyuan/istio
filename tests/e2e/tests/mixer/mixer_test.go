@@ -55,6 +55,7 @@ const (
 	denialRule               = rulesDir + "/" + "mixer-rule-ratings-denial"
 	ingressDenialRule        = rulesDir + "/" + "mixer-rule-ingress-denial"
 	newTelemetryRule         = rulesDir + "/" + "mixer-rule-additional-telemetry"
+	kubeenvTelemetryRule     = rulesDir + "/" + "mixer-rule-kubeenv-telemetry"
 	routeAllRule             = rulesDir + "/" + "route-rule-all-v1"
 	routeReviewsVersionsRule = rulesDir + "/" + "route-rule-reviews-v2-v3"
 	routeReviewsV3Rule       = rulesDir + "/" + "route-rule-reviews-v3"
@@ -64,9 +65,12 @@ const (
 	mixerMetricsPort = "42422"
 	productPagePort  = "10000"
 
-	srcLabel          = "source_service"
-	destLabel         = "destination_service"
-	responseCodeLabel = "response_code"
+	srcLabel           = "source_service"
+	srcPodLabel        = "source_pod"
+	destLabel          = "destination_service"
+	destPodLabel       = "destination_pod"
+	destContainerLabel = "destination_container"
+	responseCodeLabel  = "response_code"
 
 	// This namespace is used by default in all mixer config documents.
 	// It will be replaced with the test namespace.
@@ -85,8 +89,8 @@ type testConfig struct {
 var (
 	tc                 *testConfig
 	productPageTimeout = 60 * time.Second
-	rules              = []string{rateLimitRule, denialRule, ingressDenialRule, newTelemetryRule, routeAllRule,
-		routeReviewsVersionsRule, routeReviewsV3Rule, tcpDbRule}
+	rules              = []string{rateLimitRule, denialRule, ingressDenialRule, newTelemetryRule, kubeenvTelemetryRule,
+		routeAllRule, routeReviewsVersionsRule, routeReviewsV3Rule, tcpDbRule}
 )
 
 func (t *testConfig) Setup() (err error) {
@@ -449,6 +453,57 @@ func TestNewMetrics(t *testing.T) {
 	if got < want {
 		t.Logf("prometheus values for istio_response_size_count:\n%s", promDump(promAPI, "istio_response_size_count"))
 		t.Logf("prometheus values for istio_request_count:\n%s", promDump(promAPI, "istio_request_count"))
+		errorf(t, "Bad metric value: got %f, want at least %f", got, want)
+	}
+}
+
+func TestKubeenvMetrics(t *testing.T) {
+	if err := applyMixerRule(kubeenvTelemetryRule); err != nil {
+		fatalf(t, "could not create required mixer rule: %v", err)
+	}
+
+	defer func() {
+		if err := deleteMixerRule(kubeenvTelemetryRule); err != nil {
+			t.Logf("could not clear rule: %v", err)
+		}
+	}()
+
+	allowRuleSync()
+
+	if err := visitProductPage(productPageTimeout, http.StatusOK); err != nil {
+		fatalf(t, "Test app setup failure: %v", err)
+	}
+
+	log.Info("Successfully sent request(s) to /productpage; checking metrics...")
+	allowPrometheusSync()
+	promAPI, err := promAPI()
+	if err != nil {
+		fatalf(t, "Could not build prometheus API client: %v", err)
+	}
+	productPagePod, err := podID("app=productpage")
+	if err != nil {
+		fatalf(t, "Could not get productpage pod ID: %v", err)
+	}
+	ingressPod, err := podID("istio=ingress")
+	if err != nil {
+		fatalf(t, "Could not get ingress pod ID: %v", err)
+	}
+	query := fmt.Sprintf("istio_kube_request_count{%s=\"%s\",%s=\"%s\",%s=\"%s\",%s=\"200\"}",
+		srcPodLabel, ingressPod, destPodLabel, productPagePod, destContainerLabel, "productpage", responseCodeLabel)
+	t.Logf("prometheus query: %s", query)
+	value, err := promAPI.Query(context.Background(), query, time.Now())
+	if err != nil {
+		fatalf(t, "Could not get metrics from prometheus: %v", err)
+	}
+	log.Infof("promvalue := %s", value.String())
+
+	got, err := vectorValue(value, map[string]string{})
+	if err != nil {
+		t.Logf("prometheus values for istio_kube_request_count:\n%s", promDump(promAPI, "istio_kube_request_count"))
+		fatalf(t, "Error get metric value: %v", err)
+	}
+	want := float64(1)
+	if got < want {
 		errorf(t, "Bad metric value: got %f, want at least %f", got, want)
 	}
 }

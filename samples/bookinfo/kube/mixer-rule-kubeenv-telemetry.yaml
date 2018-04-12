@@ -1,0 +1,40 @@
+apiVersion: "config.istio.io/v1alpha2"
+kind: prometheus
+metadata:
+  name: kubeenvhandler
+  namespace: istio-system
+spec:
+  metrics:
+  - name: kube_request_count
+    instance_name: kubeenvrequestcount.metric.istio-system
+    kind: COUNTER
+    label_names:
+    - response_code
+    - source_pod
+    - destination_pod
+    - destination_container
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: metric
+metadata:
+  name: kubeenvrequestcount
+  namespace: istio-system
+spec:
+  value: "1"
+  dimensions:
+    response_code: response.code | 200
+    source_pod: source.podName | "unknown"
+    destination_pod: destination.podName | "unknown"
+    destination_container: destination.containerName | "unknown"
+  monitored_resource_type: '"UNSPECIFIED"'
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: promkubeenv
+  namespace: istio-system
+spec:
+  actions:
+  - handler: kubeenvhandler.prometheus
+    instances:
+    - kubeenvrequestcount.metric

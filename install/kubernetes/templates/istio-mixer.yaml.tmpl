@@ -721,6 +721,8 @@ spec:
       valueType: STRING
     source.serviceAccount:
       valueType: STRING
+    source.podName:
+      valueType: STRING
     destination.ip:
       valueType: IP_ADDRESS
     destination.labels:
@@ -732,6 +734,10 @@ spec:
     destination.service:
       valueType: STRING
     destination.serviceAccount:
+      valueType: STRING
+    destination.podName:
+      valueType: STRING
+    destination.containerName:
       valueType: STRING
 ---
 apiVersion: "config.istio.io/v1alpha2"
@@ -1033,6 +1039,7 @@ spec:
   source_uid: source.uid | ""
   source_ip: source.ip | ip("0.0.0.0") # default to unspecified ip addr
   destination_uid: destination.uid | ""
+  destination_port: destination.port | 0
   origin_uid: '""'
   origin_ip: ip("0.0.0.0") # default to unspecified ip addr
   attribute_bindings:
@@ -1043,9 +1050,12 @@ spec:
     source.namespace: $out.source_namespace | "default"
     source.service: $out.source_service | "unknown"
     source.serviceAccount: $out.source_service_account_name | "unknown"
+    source.podName: $out.source_pod_name | "unknown"
     destination.ip: $out.destination_pod_ip | ip("0.0.0.0")
     destination.labels: $out.destination_labels | emptyStringMap()
     destination.namespace: $out.destination_namespace | "default"
     destination.service: $out.destination_service | "unknown"
     destination.serviceAccount: $out.destination_service_account_name | "unknown"
+    destination.podName: $out.destination_pod_name | "unknown"
+    destination.containerName: $out.destination_container_name | "unknown"
 ---
