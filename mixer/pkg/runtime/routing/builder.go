@@ -53,8 +53,9 @@ import (
 	"fmt"
 	"strings"
 
+	descriptor "github.com/bianpengyuan/api/policy/v1beta1"
+
 	tpb "istio.io/api/mixer/adapter/model/v1beta1"
-	descriptor "istio.io/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/attribute"
 	"istio.io/istio/mixer/pkg/lang/ast"

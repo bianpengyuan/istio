@@ -296,6 +296,10 @@ ignored = [
   version = "2.2.1"
 
 [[constraint]]
+  name = "github.com/bianpengyuan/api"
+  branch = "grpc-adapter-auth"
+
+[[constraint]]
   name = "istio.io/api"
   branch = "master"
 
@@ -335,6 +339,10 @@ ignored = [
   non-go = true
   [[prune.project]]
     name = "istio.io/fortio"
+    non-go = false
+    unused-packages = false
+  [[prune.project]]
+    name = "github.com/bianpengyuan/api"
     non-go = false
     unused-packages = false
   [[prune.project]]

@@ -17,8 +17,8 @@ package config
 import (
 	"github.com/gogo/protobuf/proto"
 
+	configpb "github.com/bianpengyuan/api/policy/v1beta1"
 	"istio.io/api/mixer/adapter/model/v1beta1"
-	configpb "istio.io/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/runtime/config/constant"
 	"istio.io/istio/mixer/pkg/template"

@@ -19,8 +19,8 @@ import (
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/gogo/protobuf/types"
 
+	"github.com/bianpengyuan/api/policy/v1beta1"
 	adptTmpl "istio.io/api/mixer/adapter/model/v1beta1"
-	"istio.io/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/lang/ast"
 	"istio.io/istio/mixer/pkg/protobuf/yaml/dynamic"

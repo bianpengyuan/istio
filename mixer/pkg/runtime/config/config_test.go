@@ -33,8 +33,8 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 
 	adapter_model "istio.io/api/mixer/adapter/model/v1beta1"
-	configpb "istio.io/api/policy/v1beta1"
-	descriptorpb "istio.io/api/policy/v1beta1"
+	configpb "github.com/bianpengyuan/api/policy/v1beta1"
+	descriptorpb "github.com/bianpengyuan/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/config/store"
 	"istio.io/istio/mixer/pkg/template"

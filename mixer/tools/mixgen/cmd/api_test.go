@@ -78,7 +78,7 @@ func TestGenerator_Generate(t *testing.T) {
 
 			args := []string{"api", "-t", v.descriptor, "--go_out", oIntface.Name(), "--proto_out", oTmpl.Name()}
 
-			args = append(args, "-m", "policy/v1beta1/value_type.proto:istio.io/api/policy/v1beta1",
+			args = append(args, "-m", "policy/v1beta1/value_type.proto:github.com/bianpengyuan/api/policy/v1beta1",
 				"-m", "gogoproto/gogo.proto:github.com/gogo/protobuf/gogoproto",
 				"-m", "mixer/adapter/model/v1beta1/extensions.proto:istio.io/api/mixer/adapter/model/v1beta1",
 				"-m", "google/protobuf/duration.proto:github.com/gogo/protobuf/types",

@@ -183,6 +183,14 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  branch = "grpc-adapter-auth"
+  digest = "1:c1aa8575c8da16f0898c3a29ed198bebc9ab2a4e47a1dc8b3a034a1d650a1d3e"
+  name = "github.com/bianpengyuan/api"
+  packages = ["policy/v1beta1"]
+  pruneopts = "T"
+  revision = "200f662ec3aa8aa6044a2ab7fc2686a0c9fe695a"
+
+[[projects]]
   branch = "master"
   digest = "1:e60ea12cc6af851334368f7df0e3e7f6827189a482324c9e3e9772f279a24df2"
   name = "github.com/bradfitz/slice"
@@ -1939,6 +1947,7 @@
     "github.com/aws/aws-sdk-go/awstesting/unit",
     "github.com/aws/aws-sdk-go/service/cloudwatch",
     "github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface",
+    "github.com/bianpengyuan/api/policy/v1beta1",
     "github.com/bradfitz/slice",
     "github.com/cactus/go-statsd-client/statsd",
     "github.com/cactus/go-statsd-client/statsd/statsdtest",

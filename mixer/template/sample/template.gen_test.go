@@ -28,8 +28,8 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 
 	adpTmpl "istio.io/api/mixer/adapter/model/v1beta1"
-	istio_mixer_v1_config "istio.io/api/policy/v1beta1"
-	pb "istio.io/api/policy/v1beta1"
+	istio_mixer_v1_config "github.com/bianpengyuan/api/policy/v1beta1"
+	pb "github.com/bianpengyuan/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/attribute"
 	"istio.io/istio/mixer/pkg/lang/ast"

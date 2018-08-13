@@ -26,7 +26,7 @@ import (
 
 	"istio.io/istio/galley/pkg/metadata/kube"
 
-	"istio.io/api/policy/v1beta1"
+	"github.com/bianpengyuan/api/policy/v1beta1"
 	"istio.io/istio/galley/pkg/mcp/snapshot"
 	"istio.io/istio/galley/pkg/mcp/testing"
 	"istio.io/istio/mixer/pkg/config/store"

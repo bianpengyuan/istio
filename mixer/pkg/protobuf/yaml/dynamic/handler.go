@@ -15,19 +15,29 @@
 package dynamic
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"reflect"
+	"strings"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	"github.com/pkg/errors"
 	"go.uber.org/atomic"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
+	policypb "github.com/bianpengyuan/api/policy/v1beta1"
 
 	"istio.io/api/mixer/adapter/model/v1beta1"
-	policypb "istio.io/api/policy/v1beta1"
 	"istio.io/istio/mixer/pkg/adapter"
 	protoyaml "istio.io/istio/mixer/pkg/protobuf/yaml"
 	istiolog "istio.io/istio/pkg/log"
@@ -129,10 +139,130 @@ func (h *Handler) Close() error {
 	return nil
 }
 
+type basicAuthCreds struct {
+	token string
+}
+
+func (c *basicAuthCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+	return map[string]string{
+		"basic": c.token,
+	}, nil
+}
+
+func (c *basicAuthCreds) RequireTransportSecurity() bool {
+	return true
+}
+
+func processCompressedCerts(srcFile string) ([]byte, error) {
+	f, err := os.Open(srcFile)
+	if err != nil {
+		return []byte{}, err
+	}
+	defer f.Close()
+
+	gzf, err := gzip.NewReader(f)
+	if err != nil {
+		return []byte{}, err
+	}
+	tarReader := tar.NewReader(gzf)
+
+	for {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return []byte{}, err
+		}
+
+		if header.Typeflag == tar.TypeReg &&
+			strings.Contains(header.Name, "ca-certificates.crt") {
+			b, err := ioutil.ReadAll(tarReader)
+			if err != nil {
+				return []byte{}, err
+			}
+			return b, nil
+		}
+	}
+
+	return []byte{}, errors.Errorf("cannot find cert file")
+}
+
+func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, error) {
+	// load peer cert/key.
+	pk := authCfg.GetPrivateKey()
+	if pk == "" {
+		pk = "/etc/certs/key.pem"
+	}
+	cc := authCfg.GetClientCertificate()
+	if cc == "" {
+		cc = "/etc/certs/cert-chain.pem"
+	}
+	peerCert, err := tls.LoadX509KeyPair(cc, pk)
+	if err != nil {
+		return nil, errors.Errorf("load peer cert/key error: %v", err)
+	}
+
+	// load ca cert.
+	caCertPool := x509.NewCertPool()
+	// first load system ca.
+	if sysCerts, err := processCompressedCerts("/ca-certificates.tgz"); err == nil {
+		caCertPool.AppendCertsFromPEM(sysCerts)
+	} else {
+		return nil, errors.Errorf("Canot load system certs %v", err)
+	}
+
+	// load istio ca.
+	istioCaCerts, err := ioutil.ReadFile("/etc/certs/root-cert.pem")
+	if err != nil {
+		return nil, errors.Errorf("Cannot load istio CA certs %v", err)
+	}
+	caCertPool.AppendCertsFromPEM(istioCaCerts)
+
+	// load additional ca.
+	ca := authCfg.GetCaCerficates()
+	if ca != "" {
+		caCerts, err := ioutil.ReadFile(ca)
+		if err != nil {
+			return nil, err
+		}
+		caCertPool.AppendCertsFromPEM(caCerts)
+	}
+
+	ta := credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{peerCert},
+		RootCAs:      caCertPool,
+	})
+	return grpc.WithTransportCredentials(ta), nil
+}
+
 func (h *Handler) connect() (err error) {
 	codec := grpc.CallCustomCodec(Codec{})
+
+	authCfg := h.connConfig.GetAuthentication()
+	authMode := authCfg.GetMode()
+	dialAuthOpt := grpc.WithInsecure()
+	if authMode == policypb.Authentication_BASIC {
+		tokenPath := authCfg.GetBasicAuthToken()
+		if tokenPath == "" {
+			return errors.Errorf("basic auth token needs to be defined in BASIC mode")
+		}
+		authToken, err := ioutil.ReadFile(tokenPath)
+		if err != nil {
+			return errors.Errorf("cannot get auth token from the file %s, error %v", tokenPath, err)
+		}
+		dialAuthOpt = grpc.WithPerRPCCredentials(&basicAuthCreds{token: string(authToken)})
+	} else if authMode == policypb.Authentication_MUTUAL {
+		dialAuthOpt, err = buildMTLSDialOption(authCfg)
+		if err != nil {
+			return errors.Errorf("cannot config mtls connection to adapter: %v", err)
+		}
+	}
+
 	// TODO add simple secure option
-	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), grpc.WithInsecure(),
+	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), dialAuthOpt,
 		grpc.WithDefaultCallOptions(codec)); err != nil {
 		handlerLog.Errorf("Unable to connect to:%s %v", h.connConfig.GetAddress(), err)
 		return errors.WithStack(err)
