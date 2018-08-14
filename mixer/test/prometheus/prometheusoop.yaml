@@ -13,19 +13,13 @@ spec:
       instance_name: requestcount.instance.istio-system
       kind: COUNTER
       label_names:
-      - source_service
-      - source_version
       - destination_service
-      - destination_version
       - response_code
     - name: request_size
       instance_name: requestsize.instance.istio-system
       kind: DISTRIBUTION
       label_names:
-      - source_service
-      - source_version
       - destination_service
-      - destination_version
       - response_code
       buckets:
         exponentialBuckets:

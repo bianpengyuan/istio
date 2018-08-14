@@ -42,6 +42,12 @@ spec:
         app: prometheusadapter
         version: v1
     spec:
+      serviceAccountName: istio-mixer-service-account
+      volumes:
+      - name: istio-certs
+        secret:
+          secretName: istio.istio-mixer-service-account
+          optional: true
       containers:
       - image: gcr.io/bpy-istio/prometheusadapter
         imagePullPolicy: Always
@@ -49,3 +55,7 @@ spec:
         ports:
         - containerPort: 8080
         - containerPort: 42422
+        volumeMounts:
+          - name: istio-certs
+            mountPath: /etc/certs
+            readOnly: true
