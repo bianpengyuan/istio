@@ -43,7 +43,7 @@ spec:
         version: v1
     spec:
       containers:
-      - image: gcr.io/mixologist-142215/prometheusadapter
+      - image: gcr.io/bpy-istio/prometheusadapter
         imagePullPolicy: Always
         name: prometheusadapter
         ports:

@@ -7,10 +7,10 @@ package metadata
 
 import (
 	// Pull in all the known proto types to ensure we get their types registered.
+	_ "github.com/bianpengyuan/api/policy/v1beta1"
 	_ "istio.io/api/authentication/v1alpha1"
 	_ "istio.io/api/mixer/v1/config/client"
 	_ "istio.io/api/networking/v1alpha3"
-	_ "istio.io/api/policy/v1beta1"
 	_ "istio.io/api/rbac/v1alpha1"
 	_ "istio.io/istio/galley/pkg/kube/converter/legacy"
 	"istio.io/istio/galley/pkg/runtime/resource"

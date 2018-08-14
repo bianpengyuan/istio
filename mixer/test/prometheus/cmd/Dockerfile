@@ -1,5 +1,7 @@
-FROM scratch
+FROM ubuntu
 
-ADD prometheusadapter /usr/local/bin/
+ADD cmd /usr/local/bin/
 
-ENTRYPOINT ["/usr/local/bin/prometheusadapter"]
+RUN chmod 777 /usr/local/bin/cmd
+
+ENTRYPOINT ["/usr/local/bin/cmd"]

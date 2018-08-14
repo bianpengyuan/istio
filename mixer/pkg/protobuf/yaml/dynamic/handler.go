@@ -238,30 +238,36 @@ func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, err
 	return grpc.WithTransportCredentials(ta), nil
 }
 
-func (h *Handler) connect() (err error) {
-	codec := grpc.CallCustomCodec(Codec{})
-
+func (h *Handler) getAuthOpt() (dialAuthOpt grpc.DialOption, err error) {
 	authCfg := h.connConfig.GetAuthentication()
 	authMode := authCfg.GetMode()
-	dialAuthOpt := grpc.WithInsecure()
+	dialAuthOpt = grpc.WithInsecure()
 	if authMode == policypb.Authentication_BASIC {
 		tokenPath := authCfg.GetBasicAuthToken()
 		if tokenPath == "" {
-			return errors.Errorf("basic auth token needs to be defined in BASIC mode")
+			return nil, errors.Errorf("basic auth token needs to be defined in BASIC mode")
 		}
 		authToken, err := ioutil.ReadFile(tokenPath)
 		if err != nil {
-			return errors.Errorf("cannot get auth token from the file %s, error %v", tokenPath, err)
+			return nil, errors.Errorf("cannot get auth token from the file %s, error %v", tokenPath, err)
 		}
 		dialAuthOpt = grpc.WithPerRPCCredentials(&basicAuthCreds{token: string(authToken)})
 	} else if authMode == policypb.Authentication_MUTUAL {
 		dialAuthOpt, err = buildMTLSDialOption(authCfg)
 		if err != nil {
-			return errors.Errorf("cannot config mtls connection to adapter: %v", err)
+			return nil, errors.Errorf("cannot config mtls connection to adapter: %v", err)
 		}
 	}
+	return dialAuthOpt, err
+}
 
-	// TODO add simple secure option
+func (h *Handler) connect() (err error) {
+	codec := grpc.CallCustomCodec(Codec{})
+
+	dialAuthOpt, err := h.getAuthOpt()
+	if err != nil {
+		return err
+	}
 	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), dialAuthOpt,
 		grpc.WithDefaultCallOptions(codec)); err != nil {
 		handlerLog.Errorf("Unable to connect to:%s %v", h.connConfig.GetAddress(), err)
