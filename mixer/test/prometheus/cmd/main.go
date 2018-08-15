@@ -31,7 +31,8 @@ type Args struct {
 	// Port to use for the prometheus endpoint
 	PrometheusPort uint16
 
-	Mtls bool
+	Mtls      bool
+	BasicAuth bool
 }
 
 func defaultArgs() *Args {
@@ -39,6 +40,7 @@ func defaultArgs() *Args {
 		AdapterPort:    uint16(8080),
 		PrometheusPort: uint16(42422),
 		Mtls:           false,
+		BasicAuth:      false,
 	}
 }
 
@@ -65,6 +67,7 @@ func GetCmd(args []string) *cobra.Command {
 	f.Uint16VarP(&sa.PrometheusPort, "prometheusport", "a", sa.PrometheusPort,
 		"TCP port to expose prometheus endpoint on")
 	f.BoolVarP(&sa.Mtls, "enable_mtls", "m", false, "")
+	f.BoolVarP(&sa.BasicAuth, "enable_basic_auth", "b", false, "")
 
 	return cmd
 }
@@ -78,7 +81,7 @@ func main() {
 
 func runServer(args *Args) {
 	fmt.Printf("here in the args are %v", args)
-	s, err := prometheus.NewNoSessionServer(args.AdapterPort, args.PrometheusPort, args.Mtls)
+	s, err := prometheus.NewNoSessionServer(args.AdapterPort, args.PrometheusPort, args.Mtls, args.BasicAuth)
 	if err != nil {
 		fmt.Printf("unable to start sever: %v", err)
 		os.Exit(-1)

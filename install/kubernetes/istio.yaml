@@ -3021,6 +3021,10 @@ spec:
           optional: true
       - name: uds-socket
         emptyDir: {}
+      - name: oop-token
+        secret:
+          secretName: oop-secret-token
+          optional: true
       affinity:      
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -3074,6 +3078,12 @@ spec:
         volumeMounts:
         - name: uds-socket
           mountPath: /sock
+        - name: oop-token
+          mountPath: /etc/auth
+          readOnly: true
+        - name: istio-certs
+          mountPath: /etc/certs
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /version

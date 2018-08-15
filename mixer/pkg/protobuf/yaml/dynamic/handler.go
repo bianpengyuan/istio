@@ -140,7 +140,7 @@ type basicAuthCreds struct {
 
 func (c *basicAuthCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
 	return map[string]string{
-		"basic": c.token,
+		"authorization": "basic " + c.token,
 	}, nil
 }
 
@@ -197,10 +197,44 @@ func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, err
 	return grpc.WithTransportCredentials(ta), nil
 }
 
-func (h *Handler) getAuthOpt() (dialAuthOpt grpc.DialOption, err error) {
+func buildTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, error) {
+	// load ca cert.
+	caCertPool := x509.NewCertPool()
+	// load system ca.
+	sysCerts, err := ioutil.ReadFile("/etc/ssl/certs/ca-certificates.crt")
+	if err != nil {
+		return nil, errors.Errorf("Cannot load system CA certs %v", err)
+	}
+	caCertPool.AppendCertsFromPEM(sysCerts)
+
+	// load istio ca.
+	istioCaCerts, err := ioutil.ReadFile("/etc/certs/root-cert.pem")
+	if err != nil {
+		return nil, errors.Errorf("Cannot load istio CA certs %v", err)
+	}
+	caCertPool.AppendCertsFromPEM(istioCaCerts)
+
+	// load additional ca.
+	ca := authCfg.GetCaCerficates()
+	if ca != "" {
+		caCerts, err := ioutil.ReadFile(ca)
+		if err != nil {
+			return nil, err
+		}
+		caCertPool.AppendCertsFromPEM(caCerts)
+	}
+
+	ta := credentials.NewTLS(&tls.Config{
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true,
+	})
+	return grpc.WithTransportCredentials(ta), nil
+}
+
+func (h *Handler) getAuthOpt() (dialAuthOpt []grpc.DialOption, err error) {
 	authCfg := h.connConfig.GetAuthentication()
 	authMode := authCfg.GetMode()
-	dialAuthOpt = grpc.WithInsecure()
+	var opts []grpc.DialOption
 	if authMode == policypb.Authentication_BASIC {
 		tokenPath := authCfg.GetBasicAuthToken()
 		if tokenPath == "" {
@@ -210,25 +244,35 @@ func (h *Handler) getAuthOpt() (dialAuthOpt grpc.DialOption, err error) {
 		if err != nil {
 			return nil, errors.Errorf("cannot get auth token from the file %s, error %v", tokenPath, err)
 		}
-		dialAuthOpt = grpc.WithPerRPCCredentials(&basicAuthCreds{token: string(authToken)})
+		opts = append(opts, grpc.WithPerRPCCredentials(&basicAuthCreds{token: string(authToken)}))
+
+		// load certs
+		tlsOpt, err := buildTLSDialOption(authCfg)
+		if err != nil {
+			return nil, errors.Errorf("Cannot build tls option for basic auth")
+		}
+		opts = append(opts, tlsOpt)
 	} else if authMode == policypb.Authentication_MUTUAL {
-		dialAuthOpt, err = buildMTLSDialOption(authCfg)
+		dialAuthOpt, err := buildMTLSDialOption(authCfg)
 		if err != nil {
 			return nil, errors.Errorf("cannot config mtls connection to adapter: %v", err)
 		}
+		opts = append(opts, dialAuthOpt)
+	} else {
+		opts = append(opts, grpc.WithInsecure())
 	}
-	return dialAuthOpt, err
+	return opts, err
 }
 
 func (h *Handler) connect() (err error) {
 	codec := grpc.CallCustomCodec(Codec{})
 
-	dialAuthOpt, err := h.getAuthOpt()
+	opts, err := h.getAuthOpt()
 	if err != nil {
 		return err
 	}
-	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), dialAuthOpt,
-		grpc.WithDefaultCallOptions(codec)); err != nil {
+	opts = append(opts, grpc.WithDefaultCallOptions(codec))
+	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), opts...); err != nil {
 		handlerLog.Errorf("Unable to connect to: %s %v", h.connConfig.GetAddress(), err)
 		return errors.WithStack(err)
 	}

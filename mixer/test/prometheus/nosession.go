@@ -27,10 +27,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 
@@ -262,6 +264,23 @@ func getBasicAuthInterceptor(token []byte) grpc.UnaryServerInterceptor {
 		if !ok {
 			return nil, errors.New("canot find metadata")
 		}
+		vv, ok := md["authorization"]
+		if !ok {
+			return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
+		}
+		val := vv[0]
+		splits := strings.SplitN(val, " ", 2)
+		if len(splits) < 2 {
+			return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization string")
+		}
+		if strings.ToLower(splits[0]) != "basic" {
+			return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
+		}
+		authHeader := splits[1]
+		if authHeader != string(token) {
+			return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization token")
+		}
+		return handler(ctx, req)
 	}
 }
 

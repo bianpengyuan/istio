@@ -8,7 +8,8 @@ spec:
   connection:
     address: "prometheusadapter:8080"
     authentication:
-      mode: MUTUAL
+      mode: BASIC 
+      basicAuthToken: /etc/auth/token
   params:
     metrics:
     - name: request_count
