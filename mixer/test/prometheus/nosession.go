@@ -20,12 +20,19 @@ package prometheus
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/bianpengyuan/api/policy/v1beta1"
 	adptModel "istio.io/api/mixer/adapter/model/v1beta1"
@@ -209,8 +216,85 @@ func (s *NoSessionServer) Close() error {
 	return nil
 }
 
+func getMtlsAuthOpt() ([]grpc.ServerOption, error) {
+	var opts []grpc.ServerOption
+	for i := 0; i < 30; i++ {
+		// This is used for the grpc h2 implementation. It doesn't appear to be needed in
+		// the case of golang h2 stack.
+		certificate, err := tls.LoadX509KeyPair(
+			"/etc/certs/cert-chain.pem",
+			"/etc/certs/key.pem",
+		)
+		// certs not ready yet.
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		certPool := x509.NewCertPool()
+		rc, err := ioutil.ReadFile("/etc/certs/root-cert.pem")
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		ok := certPool.AppendCertsFromPEM(rc)
+		if !ok {
+			return nil, errors.New("failed to append client certs")
+		}
+
+		tlsConfig := &tls.Config{
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			Certificates: []tls.Certificate{certificate},
+			ClientCAs:    certPool,
+		}
+		opts = append(opts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	}
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("cannot get certs for server TLS %v", opts)
+	}
+	return opts, nil
+}
+
+func getBasicAuthInterceptor(token []byte) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, errors.New("canot find metadata")
+		}
+	}
+}
+
+func getBasicAuthOpt() ([]grpc.ServerOption, error) {
+	var opts []grpc.ServerOption
+	for i := 0; i < 30; i++ {
+		// This is used for the grpc h2 implementation. It doesn't appear to be needed in
+		// the case of golang h2 stack.
+		creds, err := credentials.NewServerTLSFromFile("/etc/certs/cert-chain.pem", "/etc/certs/key.pem")
+		// certs not ready yet.
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		basicAuthToken, err := ioutil.ReadFile("/etc/auth/token")
+		// basic auth token is not ready yet.
+		if err != nil {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		opts = append(opts, grpc.Creds(creds))
+		opts = append(opts, grpc.UnaryInterceptor(getBasicAuthInterceptor(basicAuthToken)))
+	}
+	if len(opts) == 0 {
+		return nil, fmt.Errorf("cannot get certs for server TLS %v", opts)
+	}
+	return opts, nil
+}
+
 // NewNoSessionServer creates a new no session server from given args.
-func NewNoSessionServer(addr uint16, promAddr uint16) (*NoSessionServer, error) {
+func NewNoSessionServer(addr uint16, promAddr uint16, enableMtls bool, enableBasicAuth bool) (*NoSessionServer, error) {
 	saddr := fmt.Sprintf(":%d", addr)
 	pddr := fmt.Sprintf(":%d", promAddr)
 
@@ -227,7 +311,20 @@ func NewNoSessionServer(addr uint16, promAddr uint16) (*NoSessionServer, error) 
 	}
 
 	fmt.Printf("listening on :%v\n", s.listener.Addr())
-	s.server = grpc.NewServer()
+
+	var opts []grpc.ServerOption
+	if enableMtls {
+		s.env.Logger().Infof("Set up mtls server")
+		if opts, err = getMtlsAuthOpt(); err != nil {
+			return nil, err
+		}
+	} else if enableBasicAuth {
+		s.env.Logger().Infof("Set up basic auth server")
+		if opts, err = getBasicAuthOpt(); err != nil {
+			return nil, err
+		}
+	}
+	s.server = grpc.NewServer(opts...)
 	metric.RegisterHandleMetricServiceServer(s.server, s)
 	if _, err = s.getHandler(nil); err != nil {
 		return nil, err

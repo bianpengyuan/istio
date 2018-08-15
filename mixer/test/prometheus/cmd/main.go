@@ -30,16 +30,19 @@ type Args struct {
 
 	// Port to use for the prometheus endpoint
 	PrometheusPort uint16
+
+	Mtls bool
 }
 
 func defaultArgs() *Args {
 	return &Args{
 		AdapterPort:    uint16(8080),
 		PrometheusPort: uint16(42422),
+		Mtls:           false,
 	}
 }
 
-// GetCmd returns the cobra command-tree.
+// GetCmd returns t he cobra command-tree.
 func GetCmd(args []string) *cobra.Command {
 	sa := defaultArgs()
 	cmd := &cobra.Command{
@@ -61,6 +64,7 @@ func GetCmd(args []string) *cobra.Command {
 		"TCP port to use for gRPC Adapter API")
 	f.Uint16VarP(&sa.PrometheusPort, "prometheusport", "a", sa.PrometheusPort,
 		"TCP port to expose prometheus endpoint on")
+	f.BoolVarP(&sa.Mtls, "enable_mtls", "m", false, "")
 
 	return cmd
 }
@@ -73,7 +77,8 @@ func main() {
 }
 
 func runServer(args *Args) {
-	s, err := prometheus.NewNoSessionServer(args.AdapterPort, args.PrometheusPort)
+	fmt.Printf("here in the args are %v", args)
+	s, err := prometheus.NewNoSessionServer(args.AdapterPort, args.PrometheusPort, args.Mtls)
 	if err != nil {
 		fmt.Printf("unable to start sever: %v", err)
 		os.Exit(-1)

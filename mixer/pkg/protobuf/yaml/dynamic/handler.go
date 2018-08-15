@@ -15,18 +15,13 @@
 package dynamic
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
-	"os"
 	"reflect"
-	"strings"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
@@ -153,43 +148,6 @@ func (c *basicAuthCreds) RequireTransportSecurity() bool {
 	return true
 }
 
-func processCompressedCerts(srcFile string) ([]byte, error) {
-	f, err := os.Open(srcFile)
-	if err != nil {
-		return []byte{}, err
-	}
-	defer f.Close()
-
-	gzf, err := gzip.NewReader(f)
-	if err != nil {
-		return []byte{}, err
-	}
-	tarReader := tar.NewReader(gzf)
-
-	for {
-		header, err := tarReader.Next()
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return []byte{}, err
-		}
-
-		if header.Typeflag == tar.TypeReg &&
-			strings.Contains(header.Name, "ca-certificates.crt") {
-			b, err := ioutil.ReadAll(tarReader)
-			if err != nil {
-				return []byte{}, err
-			}
-			return b, nil
-		}
-	}
-
-	return []byte{}, errors.Errorf("cannot find cert file")
-}
-
 func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, error) {
 	// load peer cert/key.
 	pk := authCfg.GetPrivateKey()
@@ -207,12 +165,12 @@ func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, err
 
 	// load ca cert.
 	caCertPool := x509.NewCertPool()
-	// first load system ca.
-	if sysCerts, err := processCompressedCerts("/ca-certificates.tgz"); err == nil {
-		caCertPool.AppendCertsFromPEM(sysCerts)
-	} else {
-		return nil, errors.Errorf("Canot load system certs %v", err)
+	// load system ca.
+	sysCerts, err := ioutil.ReadFile("/etc/ssl/certs/ca-certificates.crt")
+	if err != nil {
+		return nil, errors.Errorf("Cannot load system CA certs %v", err)
 	}
+	caCertPool.AppendCertsFromPEM(sysCerts)
 
 	// load istio ca.
 	istioCaCerts, err := ioutil.ReadFile("/etc/certs/root-cert.pem")
@@ -232,8 +190,9 @@ func buildMTLSDialOption(authCfg *policypb.Authentication) (grpc.DialOption, err
 	}
 
 	ta := credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{peerCert},
-		RootCAs:      caCertPool,
+		Certificates:       []tls.Certificate{peerCert},
+		RootCAs:            caCertPool,
+		InsecureSkipVerify: true,
 	})
 	return grpc.WithTransportCredentials(ta), nil
 }
@@ -270,7 +229,7 @@ func (h *Handler) connect() (err error) {
 	}
 	if h.conn, err = grpc.Dial(h.connConfig.GetAddress(), dialAuthOpt,
 		grpc.WithDefaultCallOptions(codec)); err != nil {
-		handlerLog.Errorf("Unable to connect to:%s %v", h.connConfig.GetAddress(), err)
+		handlerLog.Errorf("Unable to connect to: %s %v", h.connConfig.GetAddress(), err)
 		return errors.WithStack(err)
 	}
 

@@ -42,16 +42,17 @@ spec:
         app: prometheusadapter
         version: v1
     spec:
-      serviceAccountName: istio-mixer-service-account
       volumes:
       - name: istio-certs
         secret:
-          secretName: istio.istio-mixer-service-account
+          secretName: istio.default
           optional: true
       containers:
       - image: gcr.io/bpy-istio/prometheusadapter
         imagePullPolicy: Always
         name: prometheusadapter
+        args:
+          - --enable_mtls
         ports:
         - containerPort: 8080
         - containerPort: 42422

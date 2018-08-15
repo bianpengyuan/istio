@@ -7,6 +7,8 @@ spec:
   adapter: prometheus-nosession
   connection:
     address: "prometheusadapter:8080"
+    authentication:
+      mode: MUTUAL
   params:
     metrics:
     - name: request_count
