@@ -183,7 +183,7 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
-  digest = "1:dbe9e40f035ae057794d474c7e1a3e862a9571a29cd9e5f98ae8a72284c1e381"
+  digest = "1:cad9bc2b0642bdd28650b794c023cb85ccc46a9949ce10b5c00df7b62dd819d4"
   name = "github.com/cactus/go-statsd-client"
   packages = [
     "statsd",
