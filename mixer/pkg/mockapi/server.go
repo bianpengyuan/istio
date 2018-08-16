@@ -62,7 +62,7 @@ type AttributesServer struct {
 	Handler AttributesHandler
 
 	// CheckGlobalDict indicates whether to check if proxy global dictionary
-	// is ahead of the one used in mixer.
+	// is ahead of the one in mixer.
 	checkGlobalDict bool
 }
 
