@@ -59,7 +59,6 @@ spec:
         name: prometheusadapter
         args:
           - --enable_basic_auth
-          - --test_token="testtest"
         ports:
         - containerPort: 8080
         - containerPort: 42422
