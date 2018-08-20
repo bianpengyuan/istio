@@ -77,6 +77,7 @@ type (
 )
 
 var _ metric.HandleMetricServiceServer = &NoSessionServer{}
+var basicAuthToken string
 
 func (s *NoSessionServer) getHandler(rawcfg []byte) (metric.Handler, error) {
 	s.builderLock.RLock()
@@ -258,33 +259,31 @@ func getMtlsAuthOpt() ([]grpc.ServerOption, error) {
 	return opts, nil
 }
 
-func getBasicAuthInterceptor(token []byte) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		md, ok := metadata.FromIncomingContext(ctx)
-		if !ok {
-			return nil, errors.New("canot find metadata")
-		}
-		vv, ok := md["authorization"]
-		if !ok {
-			return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
-		}
-		val := vv[0]
-		splits := strings.SplitN(val, " ", 2)
-		if len(splits) < 2 {
-			return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization string")
-		}
-		if strings.ToLower(splits[0]) != "basic" {
-			return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
-		}
-		authHeader := splits[1]
-		if authHeader != string(token) {
-			return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization token")
-		}
-		return handler(ctx, req)
+func basicAuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, errors.New("canot find metadata")
 	}
+	vv, ok := md["authorization"]
+	if !ok {
+		return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
+	}
+	val := vv[0]
+	splits := strings.SplitN(val, " ", 2)
+	if len(splits) < 2 {
+		return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization string")
+	}
+	if strings.ToLower(splits[0]) != "basic" {
+		return nil, grpc.Errorf(codes.Unauthenticated, "Request unauthenticated with basic")
+	}
+	authHeader := splits[1]
+	if authHeader != basicAuthToken {
+		return nil, grpc.Errorf(codes.Unauthenticated, "Bad authorization token")
+	}
+	return handler(ctx, req)
 }
 
-func getBasicAuthOpt() ([]grpc.ServerOption, error) {
+func getBasicAuthOpt(l adapter.Logger, tt string) ([]grpc.ServerOption, error) {
 	var opts []grpc.ServerOption
 	for i := 0; i < 30; i++ {
 		// This is used for the grpc h2 implementation. It doesn't appear to be needed in
@@ -292,19 +291,27 @@ func getBasicAuthOpt() ([]grpc.ServerOption, error) {
 		creds, err := credentials.NewServerTLSFromFile("/etc/certs/cert-chain.pem", "/etc/certs/key.pem")
 		// certs not ready yet.
 		if err != nil {
+			l.Infof("Cannot read tls certs %v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		basicAuthToken, err := ioutil.ReadFile("/etc/auth/token")
-		// basic auth token is not ready yet.
-		if err != nil {
-			time.Sleep(5 * time.Second)
-			continue
+		if tt != "" {
+			basicAuthToken = tt
+		} else {
+			bt, err := ioutil.ReadFile("/etc/auth/secret")
+			// basic auth token is not ready yet.
+			if err != nil {
+				l.Infof("cannot read basic auth token %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			basicAuthToken = string(bt)
 		}
 
 		opts = append(opts, grpc.Creds(creds))
-		opts = append(opts, grpc.UnaryInterceptor(getBasicAuthInterceptor(basicAuthToken)))
+		opts = append(opts, grpc.UnaryInterceptor(basicAuthInterceptor))
+		break
 	}
 	if len(opts) == 0 {
 		return nil, fmt.Errorf("cannot get certs for server TLS %v", opts)
@@ -313,7 +320,7 @@ func getBasicAuthOpt() ([]grpc.ServerOption, error) {
 }
 
 // NewNoSessionServer creates a new no session server from given args.
-func NewNoSessionServer(addr uint16, promAddr uint16, enableMtls bool, enableBasicAuth bool) (*NoSessionServer, error) {
+func NewNoSessionServer(addr uint16, promAddr uint16, enableMtls bool, enableBasicAuth bool, tt string) (*NoSessionServer, error) {
 	saddr := fmt.Sprintf(":%d", addr)
 	pddr := fmt.Sprintf(":%d", promAddr)
 
@@ -339,7 +346,7 @@ func NewNoSessionServer(addr uint16, promAddr uint16, enableMtls bool, enableBas
 		}
 	} else if enableBasicAuth {
 		s.env.Logger().Infof("Set up basic auth server")
-		if opts, err = getBasicAuthOpt(); err != nil {
+		if opts, err = getBasicAuthOpt(s.env.Logger(), tt); err != nil {
 			return nil, err
 		}
 	}

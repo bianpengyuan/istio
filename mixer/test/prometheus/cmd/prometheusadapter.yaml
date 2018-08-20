@@ -42,28 +42,10 @@ spec:
         app: prometheusadapter
         version: v1
     spec:
-      volumes:
-      - name: istio-certs
-        secret:
-          secretName: istio.default
-          optional: true
-      - name: oop-token
-        secret:
-          secretName: oop-secret-token
-          optional: true
       containers:
       - image: gcr.io/bpy-istio/prometheusadapter
         imagePullPolicy: Always
         name: prometheusadapter
-        args:
-          - --enable_mtls
         ports:
         - containerPort: 8080
         - containerPort: 42422
-        volumeMounts:
-          - name: istio-certs
-            mountPath: /etc/certs
-            readOnly: true
-          - name: oop-token
-            mountPath: /etc/auth
-            readOnly: true
