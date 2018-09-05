@@ -278,22 +278,8 @@ func (mb *MutableBag) ToProto(output *mixerpb.CompressedAttributes, globalDict m
 			}
 			output.StringMaps[index] = mixerpb.StringMap{Entries: sm}
 
-		case map[string]interface{}:
-			sm := make(map[int32]int32, len(t))
-			for smk, smv := range t {
-				if _, ok := smv.(string); !ok {
-					scope.Errorf("Type of map value is not supported:%T", smv)
-					continue
-				}
-				sm[ds.assignDictIndex(smk)] = ds.assignDictIndex(smv.(string))
-			}
-
-			if output.StringMaps == nil {
-				output.StringMaps = make(map[int32]mixerpb.StringMap)
-			}
-			output.StringMaps[index] = mixerpb.StringMap{Entries: sm}
 		default:
-			scope.Errorf("Cannot convert value:%v of type:%T", v, v)
+			panic(fmt.Errorf("Cannot convert value:%v of type:%T", v, v))
 		}
 	}
 

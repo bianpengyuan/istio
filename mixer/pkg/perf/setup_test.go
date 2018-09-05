@@ -57,18 +57,17 @@ stableOrder: true
 			StableOrder: true,
 			RandomSeed:  123,
 			Requests: []Request{
-				BasicReport{
-					Attributes: map[string]interface{}{
+				BuildBasicReport(
+					map[string]interface{}{
 						"foo": "bar",
 						"baz": 42,
-					},
-				},
-				BasicCheck{
-					Attributes: map[string]interface{}{
+					}),
+				BuildBasicCheck(
+					map[string]interface{}{
 						"bar": "baz",
 						"foo": 23,
 					},
-					Quotas: map[string]istio_mixer_v1.CheckRequest_QuotaParams{
+					map[string]istio_mixer_v1.CheckRequest_QuotaParams{
 						"q1": {
 							Amount:     23,
 							BestEffort: true,
@@ -77,8 +76,7 @@ stableOrder: true
 							Amount:     54,
 							BestEffort: false,
 						},
-					},
-				},
+					}),
 			},
 		},
 	},
@@ -100,17 +98,9 @@ requests:
 		load: Load{
 			Multiplier: 100,
 			Requests: []Request{
-				BasicReport{
-					Attributes: map[string]interface{}{"destination.name": "somesrvcname"},
-				},
-				BasicReport{
-					Attributes: map[string]interface{}{"destination.name": "cvd"},
-				},
-				BasicCheck{
-					Attributes: map[string]interface{}{
-						"destination.name": "somesrvcname",
-					},
-				},
+				BuildBasicReport(map[string]interface{}{"destination.name": "somesrvcname"}),
+				BuildBasicReport(map[string]interface{}{"destination.name": "cvd"}),
+				BuildBasicCheck(map[string]interface{}{"destination.name": "somesrvcname"}, nil),
 			},
 		},
 	},
@@ -205,15 +195,16 @@ requests:
 
 func TestReportMarshal_Error(t *testing.T) {
 
-	r := &BasicReport{
-		Attributes: map[string]interface{}{
-			"foo": func() {},
-		},
-	}
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Marshal logic did not panic")
+		}
+	}()
 
-	if _, err := r.MarshalJSON(); err == nil {
-		t.Fail()
-	}
+	r := BuildBasicReport(map[string]interface{}{
+		"foo": func() {},
+	})
+	r.MarshalJSON()
 }
 
 type BrokenRequest struct {
@@ -225,6 +216,6 @@ func (b *BrokenRequest) MarshalJSON() ([]byte, error) {
 	return nil, fmt.Errorf("marshal error")
 }
 
-func (b *BrokenRequest) createRequestProtos() []interface{} {
+func (b *BrokenRequest) getRequestProtos() []interface{} {
 	return nil
 }

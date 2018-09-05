@@ -21,14 +21,12 @@ import (
 )
 
 func TestBasicReportRequest(t *testing.T) {
-	report := BasicReport{
-		Attributes: map[string]interface{}{
-			"foo": "bar",
-			"baz": int64(42),
-		},
-	}
+	report := BuildBasicReport(map[string]interface{}{
+		"foo": "bar",
+		"baz": int64(42),
+	})
 
-	protos := report.createRequestProtos()
+	protos := report.getRequestProtos()
 	if len(protos) != 1 {
 		t.Fatalf("should have created 1 proto")
 	}
@@ -68,12 +66,11 @@ func TestBasicReportRequest(t *testing.T) {
 }
 
 func TestBasicCheckRequest(t *testing.T) {
-	report := BasicCheck{
-		Attributes: map[string]interface{}{
+	report := BuildBasicCheck(
+		map[string]interface{}{
 			"foo": "bar",
 		},
-
-		Quotas: map[string]istio_mixer_v1.CheckRequest_QuotaParams{
+		map[string]istio_mixer_v1.CheckRequest_QuotaParams{
 			"zoo": {
 				BestEffort: true,
 				Amount:     43,
@@ -82,10 +79,9 @@ func TestBasicCheckRequest(t *testing.T) {
 				BestEffort: false,
 				Amount:     23,
 			},
-		},
-	}
+		})
 
-	protos := report.createRequestProtos()
+	protos := report.getRequestProtos()
 	if len(protos) != 1 {
 		t.Fatalf("should have created 1 proto")
 	}
