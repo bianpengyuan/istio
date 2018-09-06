@@ -8,6 +8,12 @@ die () {
 SCRIPTPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOTDIR="$(dirname "$SCRIPTPATH")"
 
+vendor=false
+if [[ $ROOTDIR = *"/vendor/istio.io/istio" ]]; then
+  vendor=true
+  vendorroot="${ROOTDIR%"/vendor/istio.io/istio"}"
+fi
+
 if [ ! -e "$ROOTDIR/Gopkg.lock" ]; then
   echo "Please run 'dep ensure' first"
   exit 1
@@ -21,6 +27,13 @@ protoc="$ROOTDIR/bin/protoc.sh"
 
 optimport=$ROOTDIR
 template=$ROOTDIR
+
+if [ "$vendor" = true ]; then
+  outdir=$vendorroot
+  file=$vendorroot
+  optimport=$vendorroot
+  template=$vendorroot
+fi
 
 optproto=false
 optadapter=false
@@ -57,7 +70,7 @@ done
 # echo "outdir: ${outdir}"
 
 # Ensure expected GOPATH setup
-if [ "$ROOTDIR" != "${GOPATH-$HOME/go}/src/istio.io/istio" ]; then
+if [ "$vendor" = false ] && [ "$ROOTDIR" != "${GOPATH-$HOME/go}/src/istio.io/istio" ]; then
   die "Istio not found in GOPATH/src/istio.io/"
 fi
 
@@ -68,6 +81,24 @@ IMPORTS=(
   "--proto_path=${ROOTDIR}/vendor/github.com/gogo/googleapis"
   "--proto_path=$optimport"
 )
+if [ "$vendor" = true ]; then
+  if [ ! -d "$vendorroot/vendor/istio.io/api" ]; then
+    die "Istio API is not found in vendor"
+  fi
+  if [ ! -d "$vendorroot/vendor/github.com/gogo/protobuf" ]; then
+    die "github.com/gogo/protobuf is not found in vendor"
+  fi
+  if [ ! -d "$vendorroot/vendor/github.com/gogo/googleapis" ]; then
+    die "github.com/gogo/googleapis is not found in vendor"
+  fi
+  IMPORTS=(
+    "--proto_path=${vendorroot}"
+    "--proto_path=${vendorroot}/vendor/istio.io/api"
+    "--proto_path=${vendorroot}/vendor/github.com/gogo/protobuf"
+    "--proto_path=${vendorroot}/vendor/github.com/gogo/googleapis"
+    "--proto_path=$optimport"
+  )
+fi
 
 mappings=(
   "gogoproto/gogo.proto=github.com/gogo/protobuf/gogoproto"
@@ -140,7 +171,11 @@ if [ "$opttemplate" = true ]; then
     die "template generation failure: $err";
   fi
 
-  go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" api -t "$templateDS" --go_out "$templateHG" --proto_out "$templateHSP" "${TMPL_GEN_MAP[@]}"
+  if [ "$vendor"  ]; then
+    go run "$ROOTDIR/mixer/tools/mixgen/main.go" api -t "$templateDS" --go_out "$templateHG" --proto_out "$templateHSP" "${TMPL_GEN_MAP[@]}"
+  else
+    go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" api -t "$templateDS" --go_out "$templateHG" --proto_out "$templateHSP" "${TMPL_GEN_MAP[@]}"
+  fi
 
   err=$($protoc "${IMPORTS[@]}" "$TMPL_PLUGIN" "$templateHSP")
   if [ ! -z "$err" ]; then
@@ -159,7 +194,11 @@ if [ "$opttemplate" = true ]; then
   fi
 
   templateYaml=${template/.proto/.yaml}
-  go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" template -d "$templateSDS" -o "$templateYaml" -n "$(basename "$(dirname "${template}")")"
+  if [ "$vendor"  ]; then
+    go run "$ROOTDIR/mixer/tools/mixgen/main.go" template -d "$templateSDS" -o "$templateYaml" -n "$(basename "$(dirname "${template}")")"
+  else
+    go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" template -d "$templateSDS" -o "$templateYaml" -n "$(basename "$(dirname "${template}")")"
+  fi
 
   rm "$templatePG"
 
@@ -184,7 +223,11 @@ if [ "$optadapter" = true ]; then
   fi
 
   IFS=" " read -r -a extraflags_array <<< "$extraflags"
-  go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" adapter -c "$adapteCfdDS" -o "$(dirname "${file}")" "${extraflags_array[@]}"
+  if [ "$vendor"  ]; then
+    go run "$ROOTDIR/mixer/tools/mixgen/main.go" adapter -c "$adapteCfdDS" -o "$(dirname "${file}")" "${extraflags_array[@]}"
+  else
+    go run "$GOPATH/src/istio.io/istio/mixer/tools/mixgen/main.go" adapter -c "$adapteCfdDS" -o "$(dirname "${file}")" "${extraflags_array[@]}"
+  fi
 
   exit 0
 fi

@@ -8,8 +8,13 @@ fi
 SCRIPTPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOTDIR="$(dirname "$SCRIPTPATH")"
 
+vendor=false
+if [[ $ROOTDIR = *"/vendor/istio.io/istio" ]]; then
+  vendor=true
+fi
+
 # Ensure expected GOPATH setup
-if [ "$ROOTDIR" != "${GOPATH-$HOME/go}/src/istio.io/istio" ]; then
+if [ "$vendor" = false ] && [ "$ROOTDIR" != "${GOPATH-$HOME/go}/src/istio.io/istio" ]; then
   die "Istio not found in GOPATH/src/istio.io/"
 fi
 
