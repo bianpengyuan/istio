@@ -43,6 +43,8 @@ var (
 	AdapterTag tag.Key
 	// ErrorTag holds the current error for the context.
 	ErrorTag tag.Key
+	//
+	VarietyTag tag.Key
 
 	// distribution buckets
 	durationBuckets = []float64{.0001, .00025, .0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
@@ -191,6 +193,12 @@ var (
 		"mixer/dispatcher/instances_per_request",
 		"Number of instances created per request by Mixer",
 		stats.UnitDimensionless)
+
+	// RPCsTotal ..
+	RPCsTotal = stats.Int64(
+		"mixer/runtime/rpcs_total",
+		"Total number of RPCs received by Mixer",
+		stats.UnitDimensionless)
 )
 
 func newView(measure stats.Measure, keys []tag.Key, aggregation *view.Aggregation) *view.View {
@@ -227,6 +235,7 @@ func init() {
 	configKeys := []tag.Key{ConfigIDTag}
 	envConfigKeys := []tag.Key{InitConfigIDTag, HandlerTag}
 	dispatchKeys := []tag.Key{MeshFunctionTag, HandlerTag, AdapterTag, ErrorTag}
+	rpcKeys := []tag.Key{VarietyTag, ErrorTag}
 
 	runtimeViews := []*view.View{
 		// config views
@@ -260,6 +269,8 @@ func init() {
 		// others
 		newView(DestinationsPerRequest, []tag.Key{}, view.Distribution(countBuckets...)),
 		newView(InstancesPerRequest, []tag.Key{}, view.Distribution(countBuckets...)),
+
+		newView(RPCsTotal, rpcKeys, view.Count()),
 	}
 
 	if err = view.Register(runtimeViews...); err != nil {
