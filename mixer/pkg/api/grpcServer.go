@@ -17,12 +17,15 @@ package api
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/gogo/googleapis/google/rpc"
 	multierror "github.com/hashicorp/go-multierror"
 	opentracing "github.com/opentracing/opentracing-go"
 	otlog "github.com/opentracing/opentracing-go/log"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
 	"google.golang.org/grpc/codes"
 	grpc "google.golang.org/grpc/status"
 
@@ -31,6 +34,7 @@ import (
 	"istio.io/istio/mixer/pkg/checkcache"
 	"istio.io/istio/mixer/pkg/pool"
 	"istio.io/istio/mixer/pkg/runtime/dispatcher"
+	monitoring "istio.io/istio/mixer/pkg/runtime/monitoring"
 	"istio.io/istio/mixer/pkg/status"
 
 	"istio.io/istio/pkg/log"
@@ -72,9 +76,11 @@ func NewGRPCServer(dispatcher dispatcher.Dispatcher, gp *pool.GoroutinePool, cac
 func (s *grpcServer) Check(ctx context.Context, req *mixerpb.CheckRequest) (*mixerpb.CheckResponse, error) {
 	lg.Debugf("Check (GlobalWordCount:%d, DeduplicationID:%s, Quota:%v)", req.GlobalWordCount, req.DeduplicationId, req.Quotas)
 	lg.Debug("Dispatching Preprocess Check")
+	var err error
+	defer recordRPC(ctx, "check", err)
 
 	if req.GlobalWordCount > uint32(len(s.globalWordList)) {
-		err := fmt.Errorf("inconsistent global dictionary versions used: mixer knows %d words, caller knows %d", len(s.globalWordList), req.GlobalWordCount)
+		err = fmt.Errorf("inconsistent global dictionary versions used: mixer knows %d words, caller knows %d", len(s.globalWordList), req.GlobalWordCount)
 		lg.Errora("Check failed:", err.Error())
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -218,9 +224,11 @@ var reportResp = &mixerpb.ReportResponse{}
 // Report is the entry point for the external Report method
 func (s *grpcServer) Report(ctx context.Context, req *mixerpb.ReportRequest) (*mixerpb.ReportResponse, error) {
 	lg.Debugf("Report (Count: %d)", len(req.Attributes))
+	var err error
+	defer recordRPC(ctx, "report", err)
 
 	if req.GlobalWordCount > uint32(len(s.globalWordList)) {
-		err := fmt.Errorf("inconsistent global dictionary versions used: mixer knows %d words, caller knows %d", len(s.globalWordList), req.GlobalWordCount)
+		err = fmt.Errorf("inconsistent global dictionary versions used: mixer knows %d words, caller knows %d", len(s.globalWordList), req.GlobalWordCount)
 		lg.Errora("Report failed:", err.Error())
 		return nil, grpc.Errorf(codes.Internal, err.Error())
 	}
@@ -267,7 +275,7 @@ func (s *grpcServer) Report(ctx context.Context, req *mixerpb.ReportRequest) (*m
 
 		lg.Debug("Dispatching Preprocess")
 
-		if err := s.dispatcher.Preprocess(newctx, accumBag, reportBag); err != nil {
+		if err = s.dispatcher.Preprocess(newctx, accumBag, reportBag); err != nil {
 			err = fmt.Errorf("preprocessing attributes failed: %v", err)
 			span.LogFields(otlog.String("error", err.Error()))
 			span.Finish()
@@ -279,7 +287,7 @@ func (s *grpcServer) Report(ctx context.Context, req *mixerpb.ReportRequest) (*m
 		lg.Debuga("Attribute Bag: \n", reportBag)
 		lg.Debugf("Dispatching Report %d out of %d", i+1, len(req.Attributes))
 
-		if err := reporter.Report(reportBag); err != nil {
+		if err = reporter.Report(reportBag); err != nil {
 			span.LogFields(otlog.String("error", err.Error()))
 			span.Finish()
 			errors = multierror.Append(errors, err)
@@ -296,7 +304,7 @@ func (s *grpcServer) Report(ctx context.Context, req *mixerpb.ReportRequest) (*m
 	accumBag.Done()
 	protoBag.Done()
 
-	if err := reporter.Flush(); err != nil {
+	if err = reporter.Flush(); err != nil {
 		errors = multierror.Append(errors, err)
 	}
 	reporter.Done()
@@ -312,4 +320,10 @@ func (s *grpcServer) Report(ctx context.Context, req *mixerpb.ReportRequest) (*m
 	}
 
 	return reportResp, nil
+}
+
+func recordRPC(ctx context.Context, t string, err error) {
+	newCtx, _ := tag.New(ctx, tag.Insert(monitoring.ErrorTag, strconv.FormatBool(err != nil)),
+		tag.Insert(monitoring.RpcTypeTag, t))
+	stats.Record(newCtx, monitoring.RPCsTotal.M(int64(1)))
 }

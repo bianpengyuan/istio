@@ -44,7 +44,7 @@ var (
 	// ErrorTag holds the current error for the context.
 	ErrorTag tag.Key
 	//
-	VarietyTag tag.Key
+	RpcTypeTag tag.Key
 
 	// distribution buckets
 	durationBuckets = []float64{.0001, .00025, .0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10}
@@ -235,7 +235,7 @@ func init() {
 	configKeys := []tag.Key{ConfigIDTag}
 	envConfigKeys := []tag.Key{InitConfigIDTag, HandlerTag}
 	dispatchKeys := []tag.Key{MeshFunctionTag, HandlerTag, AdapterTag, ErrorTag}
-	rpcKeys := []tag.Key{VarietyTag, ErrorTag}
+	rpcKeys := []tag.Key{RpcTypeTag, ErrorTag}
 
 	runtimeViews := []*view.View{
 		// config views
