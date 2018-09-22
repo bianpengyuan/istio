@@ -61,6 +61,11 @@ type rootArgs struct {
 	// # times to repeat the operation
 	repeat int
 
+	// currency
+	concurrency int
+
+	rate int
+
 	tracingOptions *tracing.Options
 }
 
@@ -69,6 +74,8 @@ func addAttributeFlags(cmd *cobra.Command, rootArgs *rootArgs) {
 		"Address and port of a running Mixer instance")
 	cmd.PersistentFlags().IntVarP(&rootArgs.repeat, "repeat", "r", 1,
 		"Sends the specified number of requests in quick succession")
+	cmd.PersistentFlags().IntVarP(&rootArgs.concurrency, "concurrency", "c", 1, "")
+	cmd.PersistentFlags().IntVarP(&rootArgs.rate, "rate", "", -1, "")
 
 	cmd.PersistentFlags().StringVarP(&rootArgs.attributes, "attributes", "a", "",
 		"List of name/value auto-sensed attributes specified as name1=value1,name2=value2,...")

@@ -1,0 +1,5 @@
+FROM scratch
+
+ADD mixc /usr/local/bin/
+
+ENTRYPOINT ["/usr/local/bin/mixc", "check"]
