@@ -3194,12 +3194,12 @@ spec:
         - containerPort: 9093
         - containerPort: 42422
         args:
-          - --address
-          - unix:///sock/mixer.socket
           - --configStoreURL=k8s://
           - --configDefaultNamespace=istio-system
           - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
           - --numCheckCacheEntries=0
+          - --maxConcurrentStreams=10000
+          - --apiWorkerPoolSize=10000
         volumeMounts:
         - name: uds-socket
           mountPath: /sock
@@ -4136,7 +4136,26 @@ spec:
       valueType: STRING
     destination.container.name:
       valueType: STRING
-    destination.namespace:piVersion: "config.istio.io/v1alpha2"
+    destination.namespace:
+      valueType: STRING
+    destination.service: # DEPRECATED
+      valueType: STRING
+    destination.service.uid:
+      valueType: STRING
+    destination.service.name:
+      valueType: STRING
+    destination.service.namespace:
+      valueType: STRING
+    destination.service.host:
+      valueType: STRING
+    destination.serviceAccount:
+      valueType: STRING
+    destination.workload.uid:
+      valueType: STRING
+    destination.workload.name:
+      valueType: STRING
+    destination.workload.namespace:
+      valueType: STRING
 ---
 # Configuration needed by Mixer.
 # Mixer cluster is delivered via CDS
