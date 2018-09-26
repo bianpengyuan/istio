@@ -1,9 +1,9 @@
 .PHONY: deploy docker
 
-listadapter: main.go
-	../../../../bin/gobuild.sh listadapter istio.io/istio/pkg/version .
-docker: listadapter Dockerfile
-	docker build . -t gcr.io/mixologist-142215/listadapter:latest
+noopadapter: main.go
+	../../../../bin/gobuild.sh noopadapter istio.io/istio/pkg/version .
+docker: noopadapter Dockerfile
+	docker build . -t gcr.io/bpy-istio/noopadapter:head
 
 deploy:
-	kubectl -n istio-system apply -f listadapter.yaml
+	kubectl -n istio-system apply -f noopadapter.yaml

@@ -13,37 +13,37 @@
 #   limitations under the License.
 
 ##################################################################################################
-# listadapter service
+# noopadapter service
 ##################################################################################################
 apiVersion: v1
 kind: Service
 metadata:
-  name: listadapter
+  name: noopadapter
   labels:
-    app: listadapter
+    app: noopadapter
 spec:
   ports:
   - name: http
     port: 8080
   selector:
-    app: listadapter
+    app: noopadapter
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: listadapter
+  name: noopadapter
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        app: listadapter
+        app: noopadapter
         version: v1
     spec:
       containers:
-      - image: gcr.io/mixologist-142215/listadapter
+      - image: gcr.io/bpy-istio/noopadapter:head
         imagePullPolicy: Always
-        name: listadapter
+        name: noopadapter
         args:
         - "8080"
         ports:

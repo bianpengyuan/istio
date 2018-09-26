@@ -1,0 +1,51 @@
+apiVersion: "config.istio.io/v1alpha2"
+kind: authorization
+metadata:
+  name: authinfo
+  namespace: istio-system
+spec:
+  action:
+    properties:
+      contextReporterKind: context.reporter.kind | "unknown"
+      desinationNamespace: destination.namespace | "unknown"
+      sourceNamespace: source.namespace | "unknown"
+      contextReportUID: context.reporter.uid | "unknown"
+      requestId: request.id | "unknown"
+      requestHost: request.host | "unknown"
+      requestMethod: request.method | "unknown"
+      requestPath: request.path | "unknown"
+      sourceUid: source.uid | "unknown"
+      sourcePrincipal: source.principal | "unknown"
+      destinationPrincipal: destination.principal | "unknown"
+      connectionEvent: connection.event | "unknown"
+      connectionProtocol: context.protocol | "unknown"
+      apiProtocol: api.protocol | "unknown"
+      requestTotalSize: request.total_size | 1234
+      requestSize: request.size | 1234
+      responseCode: response.code | 1234
+      responseTotalSize: response.total_size | 1234
+      responseSize: response.size | 1234
+      destinationPort: destination.port | 1234
+      connectionSentBytes: connection.sent.bytes | 1234
+      connectionSentBytesTotal: connection.sent.bytes_total | 123
+      requestTime: request.time | timestamp("2017-01-01T00:00:00Z")
+      responseTime: response.time | timestamp("2017-01-01T00:00:00Z")
+      requestHeaders: request.headers | emptyStringMap()
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: noop-rule
+  namespace: istio-system
+spec:
+  actions:
+  - handler: handler.noop
+    instances:
+    - authinfo.authorization
+---
+apiVersion: "config.istio.io/v1alpha2"
+kind: noop
+metadata:
+  name: handler
+  namespace: istio-system
+spec:
