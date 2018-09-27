@@ -120,13 +120,13 @@ func check(rootArgs *rootArgs, printf, fatalf shared.FormatFn, quotas map[string
 					request.Quotas[name] = mixerpb.CheckRequest_QuotaParams{Amount: amount, BestEffort: true}
 				}
 
-				response, err := cs.client.Check(ctx, &request)
+				_, err := cs.client.Check(ctx, &request)
 
 				if err == nil {
-					printf("Check RPC completed successfully. Check status was %s", decodeStatus(response.Precondition.Status))
-					printf("  Valid use count: %v, valid duration: %v", response.Precondition.ValidUseCount, response.Precondition.ValidDuration)
-					dumpReferencedAttributes(printf, fatalf, response.Precondition.ReferencedAttributes)
-					dumpQuotas(printf, response.Quotas)
+					// printf("Check RPC completed successfully. Check status was %s", decodeStatus(response.Precondition.Status))
+					// printf("  Valid use count: %v, valid duration: %v", response.Precondition.ValidUseCount, response.Precondition.ValidDuration)
+					// dumpReferencedAttributes(printf, fatalf, response.Precondition.ReferencedAttributes)
+					// dumpQuotas(printf, response.Quotas)
 				} else {
 					printf("Check RPC failed with: %s", decodeError(err))
 				}

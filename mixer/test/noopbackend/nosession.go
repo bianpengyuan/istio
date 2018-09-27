@@ -33,6 +33,7 @@ type (
 		Addr() net.Addr
 		Close() error
 		Run()
+		Wait() error
 	}
 
 	// NoSessionServer models no session adapter backend.

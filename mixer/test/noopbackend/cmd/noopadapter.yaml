@@ -19,6 +19,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: noopadapter
+  namespace: istio-system
   labels:
     app: noopadapter
 spec:
@@ -28,23 +29,22 @@ spec:
   selector:
     app: noopadapter
 ---
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: v1
+kind: Pod
 metadata:
   name: noopadapter
+  namespace: istio-system
+  labels:
+    app: noopadapter
+    version: v1
 spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: noopadapter
-        version: v1
-    spec:
-      containers:
-      - image: gcr.io/bpy-istio/noopadapter:head
-        imagePullPolicy: Always
-        name: noopadapter
-        args:
-        - "8080"
-        ports:
-        - containerPort: 8080
+  containers:
+  - image: gcr.io/bpy-istio/noopadapter:head
+    imagePullPolicy: Always
+    name: noopadapter
+    args:
+    - "8080"
+    ports:
+    - containerPort: 8080
+  nodeSelector:
+    workload: policy

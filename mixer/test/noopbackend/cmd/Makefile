@@ -1,8 +1,8 @@
 .PHONY: deploy docker
 
 noopadapter: main.go
-	../../../../bin/gobuild.sh noopadapter istio.io/istio/pkg/version .
-docker: noopadapter Dockerfile
+	go build -o noopbackend .
+docker: noopbackend Dockerfile
 	docker build . -t gcr.io/bpy-istio/noopadapter:head
 
 deploy:
