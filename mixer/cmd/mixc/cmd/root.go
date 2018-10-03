@@ -66,6 +66,8 @@ type rootArgs struct {
 
 	rate int
 
+	reportBatchSize int
+
 	tracingOptions *tracing.Options
 }
 
@@ -76,6 +78,7 @@ func addAttributeFlags(cmd *cobra.Command, rootArgs *rootArgs) {
 		"Sends the specified number of requests in quick succession")
 	cmd.PersistentFlags().IntVarP(&rootArgs.concurrency, "concurrency", "c", 1, "")
 	cmd.PersistentFlags().IntVarP(&rootArgs.rate, "rate", "", -1, "")
+	cmd.PersistentFlags().IntVarP(&rootArgs.reportBatchSize, "report_batch_size", "", 1, "")
 
 	cmd.PersistentFlags().StringVarP(&rootArgs.attributes, "attributes", "a", "",
 		"List of name/value auto-sensed attributes specified as name1=value1,name2=value2,...")

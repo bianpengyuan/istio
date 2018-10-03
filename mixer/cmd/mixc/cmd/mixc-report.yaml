@@ -1,0 +1,42 @@
+# Copyright 2018 Istio Authors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mixc
+  namespace: istio-system
+  labels:
+    app: mixc
+spec:
+  nodeSelector:
+    workload: mixc
+  containers:
+  - image: gcr.io/bpy-istio/mixc:report
+    imagePullPolicy: Always
+    name: mixc
+    args:
+    - --repeat=1000000
+    - --rate=1000
+    - --concurrency=2000
+    - --mixer
+    - 'istio-policy:9091'
+    - --string_attributes
+    - 'context.reporter.kind=server,destination.namespace=default,source.namespace=default,context.reporter.uid=report-uid,request.id=1234567890abcdef,request.host=www.google.com,request.method=GET,request.path=/bookinfo,source.uid=source-uid,source.principal=source-principle,destination.principal=destination-principle,connection.event=OPEN,context.protocol=http,api.protocol=api-protocol'
+    - --int64_attributes
+    - 'request.total_size=12345,request.size=13434,response.code=302,response.total_size=45343,response.size=3432,destination.port=4231,connection.sent.bytes=3434,connection.sent.bytes_total=3423'
+    - --timestamp_attributes
+    - 'request.time=2006-01-02T15:04:05Z,response.time=2016-01-02T15:04:05Z'
+    - --stringmap_attributes
+    - 'request.headers=head1:value1;head2:value2;head3:value3;head4:value4;head5:value5;head6:value6;aaaaaaaaaaaaaa:bbbbbbbbbbbbbb;cccccccccccccc:dddddddddddd;eeeeeeeeeeee:fffffffffffffff;ggggggggggggg:hhhhhhhhhh'
+
