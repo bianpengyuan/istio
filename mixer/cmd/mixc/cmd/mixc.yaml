@@ -30,7 +30,7 @@ spec:
     - --rate=1000
     - --concurrency=2000
     - --mixer
-    - 'istio-policy:9091'
+    - 'mixer:9091'
     - --string_attributes
     - 'context.reporter.kind=server,destination.namespace=default,source.namespace=default,context.reporter.uid=report-uid,request.id=1234567890abcdef,request.host=www.google.com,request.method=GET,request.path=/bookinfo,source.uid=source-uid,source.principal=source-principle,destination.principal=destination-principle,connection.event=OPEN,context.protocol=http,api.protocol=api-protocol'
     - --int64_attributes

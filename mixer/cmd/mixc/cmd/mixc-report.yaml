@@ -26,11 +26,13 @@ spec:
     imagePullPolicy: Always
     name: mixc
     args:
-    - --repeat=1000000
-    - --rate=1000
+    - --repeat=1000000000
+    - --rate=100
     - --concurrency=2000
+    - --report_batch_size=1000
+    - --print_response=false
     - --mixer
-    - 'istio-policy:9091'
+    - 'mixer:9091'
     - --string_attributes
     - 'context.reporter.kind=server,destination.namespace=default,source.namespace=default,context.reporter.uid=report-uid,request.id=1234567890abcdef,request.host=www.google.com,request.method=GET,request.path=/bookinfo,source.uid=source-uid,source.principal=source-principle,destination.principal=destination-principle,connection.event=OPEN,context.protocol=http,api.protocol=api-protocol'
     - --int64_attributes

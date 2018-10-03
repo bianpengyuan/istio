@@ -23,7 +23,7 @@ import (
 
 func main() {
 	rootCmd := cmd.GetRootCmd(os.Args[1:], shared.Printf, shared.Fatalf)
-
+	shared.Printf("get the root command! start to execute")
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(-1)
 	}

@@ -80,14 +80,16 @@ func report(rootArgs *rootArgs, printf, fatalf shared.FormatFn) {
 				}
 				request := mixerpb.ReportRequest{Attributes: ca}
 				if rl != nil {
-					rl.Wait(context.TODO())
+					rl.Wait(context.Background())
 				}
 				_, err := cs.client.Report(ctx, &request)
 
-				printf("Report RPC returned %s", decodeError(err))
+				if rootArgs.printResponse {
+					printf("Report RPC returned %s", decodeError(err))
+				}
 			}
 		}()
 	}
-
+	wg.Wait()
 	span.Finish()
 }

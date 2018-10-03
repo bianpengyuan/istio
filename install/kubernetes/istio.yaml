@@ -2405,7 +2405,7 @@ subjects:
 apiVersion: v1
 kind: Service
 metadata:
-  name: istio-policy
+  name: mixer
   namespace: istio-system
   labels:
     chart: mixer-1.1.0
@@ -2421,93 +2421,6 @@ spec:
     port: 9093
   selector:
     istio: mixer
-    istio-mixer-type: policy
----
-# Source: istio/charts/mixer/templates/deployment.yaml
-
-apiVersion: v1
-kind: Pod
-metadata:
-  name: istio-policy
-  namespace: istio-system
-  labels:
-    app: istio-mixer
-    istio: mixer
-    chart: mixer-1.1.0
-    release: istio
-    version: 1.1.0
-    heritage: Tiller
-    istio-mixer-type: policy
-  annotations:
-    sidecar.istio.io/inject: "false"
-    scheduler.alpha.kubernetes.io/critical-pod: ""
-spec:
-  nodeSelector:
-    workload: policy
-  serviceAccountName: istio-mixer-service-account
-  volumes:
-  - name: istio-certs
-    secret:
-      secretName: istio.istio-mixer-service-account
-      optional: true
-  - name: uds-socket
-    emptyDir: {}
-  affinity:      
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: beta.kubernetes.io/arch
-            operator: In
-            values:
-            - amd64
-            - ppc64le
-            - s390x
-      preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 2
-        preference:
-          matchExpressions:
-          - key: beta.kubernetes.io/arch
-            operator: In
-            values:
-            - amd64
-      - weight: 2
-        preference:
-          matchExpressions:
-          - key: beta.kubernetes.io/arch
-            operator: In
-            values:
-            - ppc64le
-      - weight: 2
-        preference:
-          matchExpressions:
-          - key: beta.kubernetes.io/arch
-            operator: In
-            values:
-            - s390x
-  containers:
-  - name: mixer
-    image: "gcr.io/bpy-istio/mixer:head"
-    imagePullPolicy: IfNotPresent
-    ports:
-    - containerPort: 9093
-    - containerPort: 42422
-    args:
-      - --configStoreURL=k8s://
-      - --configDefaultNamespace=istio-system
-      - --trace_zipkin_url=http://zipkin:9411/api/v1/spans
-      - --numCheckCacheEntries=0
-      - --maxConcurrentStreams=10000
-      - --apiWorkerPoolSize=10000
-    volumeMounts:
-    - name: uds-socket
-      mountPath: /sock
-    livenessProbe:
-      httpGet:
-        path: /version
-        port: 9093
-      initialDelaySeconds: 5
-      periodSeconds: 5
 ---
 # Source: istio/charts/mixer/templates/config.yaml
 apiVersion: "config.istio.io/v1alpha2"

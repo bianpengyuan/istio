@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: istio-policy
+  name: mixer
   namespace: istio-system
   labels:
     app: istio-mixer
@@ -10,7 +10,6 @@ metadata:
     release: istio
     version: 1.1.0
     heritage: Tiller
-    istio-mixer-type: policy
   annotations:
     sidecar.istio.io/inject: "false"
     scheduler.alpha.kubernetes.io/critical-pod: ""
