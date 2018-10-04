@@ -27,7 +27,7 @@ spec:
     name: mixc
     args:
     - --repeat=1000000000
-    - --rate=100
+    - --rate=40
     - --concurrency=2000
     - --report_batch_size=1000
     - --print_response=false
