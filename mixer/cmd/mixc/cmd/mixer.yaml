@@ -14,8 +14,6 @@ metadata:
     sidecar.istio.io/inject: "false"
     scheduler.alpha.kubernetes.io/critical-pod: ""
 spec:
-  nodeSelector:
-    workload: policy
   serviceAccountName: istio-mixer-service-account
   volumes:
   - name: istio-certs
@@ -59,8 +57,8 @@ spec:
             - s390x
   containers:
   - name: mixer
-    image: "gcr.io/bpy-istio/mixer:head"
-    imagePullPolicy: IfNotPresent
+    image: gcr.io/bpy-istio/mixer:head
+    imagePullPolicy: Always
     ports:
     - containerPort: 9093
     - containerPort: 42422

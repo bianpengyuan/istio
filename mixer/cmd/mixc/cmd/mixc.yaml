@@ -19,16 +19,14 @@ metadata:
   labels:
     app: mixc
 spec:
-  nodeSelector:
-    workload: mixc
   containers:
   - image: gcr.io/bpy-istio/mixc:head
     imagePullPolicy: Always
     name: mixc
     args:
     - --repeat=1000000
-    - --rate=1000
-    - --concurrency=2000
+    - --rate=1
+    - --concurrency=1
     - --mixer
     - 'mixer:9091'
     - --string_attributes

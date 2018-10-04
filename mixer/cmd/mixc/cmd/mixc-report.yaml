@@ -27,7 +27,7 @@ spec:
     name: mixc
     args:
     - --repeat=1000000000
-    - --rate=40
+    - --rate=80
     - --concurrency=2000
     - --report_batch_size=1000
     - --print_response=false
@@ -41,4 +41,3 @@ spec:
     - 'request.time=2006-01-02T15:04:05Z,response.time=2016-01-02T15:04:05Z'
     - --stringmap_attributes
     - 'request.headers=head1:value1;head2:value2;head3:value3;head4:value4;head5:value5;head6:value6;aaaaaaaaaaaaaa:bbbbbbbbbbbbbb;cccccccccccccc:dddddddddddd;eeeeeeeeeeee:fffffffffffffff;ggggggggggggg:hhhhhhhhhh'
-

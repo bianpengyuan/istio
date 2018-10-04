@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"sync"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
@@ -53,6 +55,10 @@ type (
 
 		// n generates dedupeID when not given.
 		n *atomic.Uint64
+
+		ticker       *time.Ticker
+		mux          sync.RWMutex
+		reportBuffer []*adapter.EncodedInstance
 	}
 
 	// Svc encapsulates abstract service
@@ -126,6 +132,9 @@ func (h *Handler) Close() error {
 	if h.conn != nil {
 		return h.conn.Close()
 	}
+	if h.ticker != nil {
+		h.ticker.Stop()
+	}
 	return nil
 }
 
@@ -198,7 +207,22 @@ var _ adapter.RemoteReportHandler = &Handler{}
 // HandleRemoteReport implements adapter.RemoteReportHandler api
 func (h *Handler) HandleRemoteReport(ctx context.Context, encodedInstances []*adapter.EncodedInstance) error {
 	// ReportResult is empty and it is ignored
-	return h.handleRemote(ctx, nil, "", &v1beta1.ReportResult{}, encodedInstances...)
+	h.mux.Lock()
+	h.reportBuffer = append(h.reportBuffer, encodedInstances...)
+	if len(h.reportBuffer) < 5000 {
+		h.mux.Unlock()
+		return nil
+	}
+	insts := h.reportBuffer
+	h.reportBuffer = make([]*adapter.EncodedInstance, 0, len(insts))
+	h.mux.Unlock()
+	go func() {
+		err := h.handleRemote(context.Background(), nil, "", &v1beta1.ReportResult{}, insts...)
+		if err != nil {
+			handlerLog.Errorf("Remote report failed: %v", err)
+		}
+	}()
+	return nil
 }
 
 var _ adapter.RemoteQuotaHandler = &Handler{}
