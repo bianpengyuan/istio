@@ -120,6 +120,22 @@ func (s *NoSessionServer) get{{.InterfaceName -}}Handler(rawcfg []byte) ({{.GoPa
 func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoPackageName}}.Instance {
 	out := make([]*{{.GoPackageName}}.Instance, 0, len(in))
 
+	{{define "decode"}}
+		{{if .ProtoType.IsResourceMessage}}
+		{{.GoName}}
+		{{else if eq .ProtoType.Name "map<string, istio.policy.v1beta1.Value>" -}}
+		{{.GoName}}: decodeDimensions(inst.{{.GoName}}),
+		{{else if eq .ProtoType.Name "istio.policy.v1beta1.Value" -}}
+		{{.GoName}}: decodeValue(inst.{{.GoName}}.GetValue()),
+		{{else if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
+		{{.GoName}}: tmp{{.GoName}},
+		{{else if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
+		{{.GoName}}: tmp{{.GoName}},
+		{{else -}}
+		{{.GoName}}: inst.{{.GoName}},
+		{{end -}}
+	{{end}}
+
 	for _, inst := range in {
 		{{range .TemplateMessage.Fields -}}
 		{{if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
