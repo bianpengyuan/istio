@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"text/template"
 
@@ -75,10 +76,6 @@ func (sg *ServerGenerator) Generate() error {
 			return err
 		}
 	}
-
-	for _, m := range models {
-		fmt.Printf("%v %v\n", m.TemplateName, m.InterfaceName)
-	}
 	f1, err := os.Create(sg.OutServerPath)
 	if err != nil {
 		return err
@@ -100,21 +97,40 @@ func (sg *ServerGenerator) getServerGoContent(models []*modelgen.Model, adapterN
 		Models         []*modelgen.Model
 	}
 	ms := MS{AdapterName: adapterName, AdapterPackage: adapterPackage, Models: models, Packages: packages}
-	fmt.Printf("%+v\n", ms)
 	serverTmpl, err := template.New("ProcServer").Funcs(
 		template.FuncMap{
 			"Capitalize": strings.Title,
-			"FindMessage": func(model string, message string) *modelgen.MessageInfo {
+			"FindInterface": func(in modelgen.MessageInfo) string {
 				for _, m := range ms.Models {
-					if m.TemplateName == model {
+					if reflect.DeepEqual(m.TemplateMessage, in) {
+						return m.InterfaceName
+					}
+				}
+				return ""
+			},
+			"ConstructDecodeFunc": func(pkg string, goType string) string {
+				return "decode" + strings.Title(pkg) + goType[1:]
+			},
+			"FindMessage": func(in modelgen.MessageInfo, message string) modelgen.MessageInfo {
+				for _, m := range ms.Models {
+					if reflect.DeepEqual(m.TemplateMessage, in) {
 						for _, r := range m.ResourceMessages {
-							if r.Name == message {
-								return &r
+							if "*"+r.Name == message {
+								return r
+							}
+						}
+					}
+					for _, r := range m.ResourceMessages {
+						if reflect.DeepEqual(r, in) {
+							for _, r := range m.ResourceMessages {
+								if "*"+r.Name == message {
+									return r
+								}
 							}
 						}
 					}
 				}
-				return nil
+				return modelgen.MessageInfo{}
 			},
 		}).Parse(noSessionTmpl)
 	if err != nil {

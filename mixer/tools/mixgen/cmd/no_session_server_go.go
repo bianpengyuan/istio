@@ -116,13 +116,12 @@ func (s *NoSessionServer) get{{.InterfaceName -}}Handler(rawcfg []byte) ({{.GoPa
 	return s.{{.GoPackageName}}Handler, nil
 }
 {{end}}
-{{range .Models}}
-func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoPackageName}}.Instance {
-	out := make([]*{{.GoPackageName}}.Instance, 0, len(in))
 
-	{{define "decode"}}
-		{{if .ProtoType.IsResourceMessage}}
-		{{.GoName}}
+{{define "decode"}}
+		{{range .Fields -}}
+		{{if .ProtoType.IsResourceMessage -}}
+		{{$gp := FindInterface $}}
+		{{.GoName}}: {{ConstructDecodeFunc $gp .GoType.Name}}Msg(inst.{{.GoName}}),
 		{{else if eq .ProtoType.Name "map<string, istio.policy.v1beta1.Value>" -}}
 		{{.GoName}}: decodeDimensions(inst.{{.GoName}}),
 		{{else if eq .ProtoType.Name "istio.policy.v1beta1.Value" -}}
@@ -134,7 +133,25 @@ func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoP
 		{{else -}}
 		{{.GoName}}: inst.{{.GoName}},
 		{{end -}}
-	{{end}}
+		{{end -}}
+{{end -}}
+
+{{range .Models -}}
+{{$tn := .InterfaceName -}}
+{{$gp := .GoPackageName -}}
+{{range .ResourceMessages -}}
+func decode{{$tn}}{{.Name}}Msg(inst *{{$gp}}.{{.Name}}Msg) *{{$gp}}.{{.Name}} {
+	return &{{$gp}}.{{.Name}}{
+		{{template "decode" .}}
+	}
+}
+{{end -}}
+{{end -}}
+
+{{range .Models}}
+{{if eq .VarietyName "TEMPLATE_VARIETY_REPORT" -}}
+func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoPackageName}}.Instance {
+	out := make([]*{{.GoPackageName}}.Instance, 0, len(in))
 
 	for _, inst := range in {
 		{{range .TemplateMessage.Fields -}}
@@ -146,23 +163,28 @@ func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoP
 		{{end -}}
 		{{end -}}
 		out = append(out, &{{.GoPackageName}}.Instance{
-			Name: inst.Name,c
-			{{range .TemplateMessage.Fields -}}
-			{{if .ProtoType.IsResourceMessage}}
-			{{else if eq .ProtoType.Name "map<string, istio.policy.v1beta1.Value>" -}}
-			{{.GoName}}: decodeDimensions(inst.{{.GoName}}),
-			{{else if eq .ProtoType.Name "istio.policy.v1beta1.Value" -}}
-			{{.GoName}}: decodeValue(inst.{{.GoName}}.GetValue()),
-			{{else if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
-			{{.GoName}}: tmp{{.GoName}},
-			{{else -}}
-			{{.GoName}}: inst.{{.GoName}},
-			{{end -}}
-			{{end -}}
+			Name: inst.Name,
+			{{template "decode" .TemplateMessage}}
 		})
 	}
 	return out
 }
+{{else if or (eq .VarietyName "TEMPLATE_VARIETY_CHECK") (eq .VarietyName "TEMPLATE_VARIETY_Quota") -}}
+func {{.GoPackageName}}Instance(inst *{{.GoPackageName}}.InstanceMsg) *{{.GoPackageName}}.Instance {
+	{{range .TemplateMessage.Fields -}}
+	{{if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
+	tmp{{.GoName}}, err := proto.TimestampFromProto(inst.{{.GoName}}.GetValue())
+	if err != nil {
+		continue
+	}
+	{{end -}}
+	{{end -}}
+	return &{{.GoPackageName}}.Instance{
+		Name: inst.Name,
+		{{template "decode" .TemplateMessage}}
+	}
+}
+{{end -}}
 {{end}}
 
 func decodeDimensions(in map[string]*v1beta1.Value) map[string]interface{} {
@@ -209,7 +231,7 @@ func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.
 		return nil, err
 	}
 
-	cr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instances(r.Instances))
+	cr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instance(r.Instance))
 	if err != nil {
 		s.env.Logger().Errorf("Could not process: %v", err)
 		return nil, err
@@ -223,26 +245,12 @@ func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.
 		return nil, err
 	}
 
-	qr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instances(r.Instances))
+	qr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instance(r.Instances))
 	if err != nil {
 		s.env.Logger().Errorf("Could not process: %v", err)
 		return nil, err
 	}
 	return qr, nil
-}
-{{else if eq .VarietyName "TEMPLATE_VARIETY_CHECK" -}}
-func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.GoPackageName}}.Handle{{.InterfaceName -}}Request) (*adptModel.ReportResult, error) {
-	h, err := s.get{{.InterfaceName -}}Handler(r.AdapterConfig.Value)
-	if err != nil {
-		return nil, err
-	}
-
-	cr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instances(r.Instances))
-	if err != nil {
-		s.env.Logger().Errorf("Could not process: %v", err)
-		return nil, err
-	}
-	return cr, nil
 }
 {{end}}
 {{end}}
