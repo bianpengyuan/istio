@@ -169,7 +169,7 @@ func {{.GoPackageName}}Instances(in []*{{.GoPackageName}}.InstanceMsg) []*{{.GoP
 	}
 	return out
 }
-{{else if or (eq .VarietyName "TEMPLATE_VARIETY_CHECK") (eq .VarietyName "TEMPLATE_VARIETY_Quota") -}}
+{{else if or (eq .VarietyName "TEMPLATE_VARIETY_CHECK") (eq .VarietyName "TEMPLATE_VARIETY_QUOTA") -}}
 func {{.GoPackageName}}Instance(inst *{{.GoPackageName}}.InstanceMsg) *{{.GoPackageName}}.Instance {
 	{{range .TemplateMessage.Fields -}}
 	{{if eq .ProtoType.Name "istio.policy.v1beta1.TimeStamp" -}}
@@ -225,7 +225,7 @@ func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.
 	return &adptModel.ReportResult{}, nil
 }
 {{else if eq .VarietyName "TEMPLATE_VARIETY_CHECK" -}}
-func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.GoPackageName}}.Handle{{.InterfaceName -}}Request) (*adptModel.ReportResult, error) {
+func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.GoPackageName}}.Handle{{.InterfaceName -}}Request) (*adptModel.CheckResult, error) {
 	h, err := s.get{{.InterfaceName -}}Handler(r.AdapterConfig.Value)
 	if err != nil {
 		return nil, err
@@ -236,21 +236,43 @@ func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.
 		s.env.Logger().Errorf("Could not process: %v", err)
 		return nil, err
 	}
-	return cr, nil
+	return &adptModel.CheckResult{
+		Status:        cr.Status,
+		ValidDuration: cr.ValidDuration,
+		ValidUseCount: cr.ValidUseCount,
+	}, nil
 }
 {{else if eq .VarietyName "TEMPLATE_VARIETY_QUOTA" -}}
-func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.GoPackageName}}.Handle{{.InterfaceName -}}Request) (*adptModel.ReportResult, error) {
+func (s *NoSessionServer) Handle{{.InterfaceName -}}(ctx context.Context, r *{{.GoPackageName}}.Handle{{.InterfaceName -}}Request) (*adptModel.QuotaResult, error) {
 	h, err := s.get{{.InterfaceName -}}Handler(r.AdapterConfig.Value)
 	if err != nil {
 		return nil, err
 	}
 
-	qr, err := h.Handle{{.InterfaceName -}}(ctx, {{.GoPackageName}}Instance(r.Instances))
+	qi := {{.GoPackageName}}Instance(r.Instance)
+	resp := adptModel.QuotaResult{
+		Quotas: make(map[string]adptModel.QuotaResult_Result),
+	}
+	for qt, p := range r.QuotaRequest.Quotas {
+		qa := adapter.QuotaArgs{
+			DeduplicationID: r.DedupId,
+			QuotaAmount:     p.Amount,
+			BestEffort:      p.BestEffort,
+		}
+		qr, err := h.Handle{{.InterfaceName -}}(ctx, qi, qa)
+		if err != nil {
+			return nil, err
+		}
+		resp.Quotas[qt] = adptModel.QuotaResult_Result{
+			ValidDuration: qr.ValidDuration,
+			GrantedAmount: qr.Amount,
+		}
+	}
 	if err != nil {
 		s.env.Logger().Errorf("Could not process: %v", err)
 		return nil, err
 	}
-	return qr, nil
+	return &resp, nil
 }
 {{end}}
 {{end}}
