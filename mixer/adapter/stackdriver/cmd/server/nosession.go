@@ -24,6 +24,7 @@ import (
 
 	proto "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
+
 	adptModel "istio.io/api/mixer/adapter/model/v1beta1"
 	"istio.io/api/policy/v1beta1"
 	stackdriver "istio.io/istio/mixer/adapter/stackdriver"
@@ -259,14 +260,6 @@ func transformValueMap(in map[string]*v1beta1.Value) map[string]interface{} {
 	out := make(map[string]interface{}, len(in))
 	for k, v := range in {
 		out[k] = transformValue(v.GetValue())
-	}
-	return out
-}
-
-func transformValueSlice(in []interface{}) []interface{} {
-	out := make([]interface{}, 0, len(in))
-	for _, inst := range in {
-		out = append(out, transformValue(inst))
 	}
 	return out
 }
