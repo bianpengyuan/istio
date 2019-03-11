@@ -15,15 +15,12 @@
 package mixer
 
 import (
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"time"
 
 	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	"github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
-	e "github.com/envoyproxy/go-control-plane/envoy/api/v2/endpoint"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/listener"
 	"github.com/envoyproxy/go-control-plane/envoy/api/v2/route"
 	http_conn "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
@@ -89,108 +86,110 @@ func NewPlugin() plugin.Plugin {
 
 // OnOutboundListener implements the Callbacks interface method.
 func (mixerplugin) OnOutboundListener(in *plugin.InputParams, mutable *plugin.MutableObjects) error {
-	if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
-		return nil
-	}
+	return nil
+	// if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
+	// 	return nil
+	// }
 
-	attrs := attributes{
-		"source.uid":            attrUID(in.Node),
-		"source.namespace":      attrNamespace(in.Node),
-		"context.reporter.uid":  attrUID(in.Node),
-		"context.reporter.kind": attrStringValue("outbound"),
-	}
+	// attrs := attributes{
+	// 	"source.uid":            attrUID(in.Node),
+	// 	"source.namespace":      attrNamespace(in.Node),
+	// 	"context.reporter.uid":  attrUID(in.Node),
+	// 	"context.reporter.kind": attrStringValue("outbound"),
+	// }
 
-	switch in.ListenerProtocol {
-	case plugin.ListenerProtocolHTTP:
-		filter := buildOutboundHTTPFilter(in.Env.Mesh, attrs, in.Node)
-		for cnum := range mutable.FilterChains {
-			mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
-		}
-		return nil
-	case plugin.ListenerProtocolTCP:
-		filter := buildOutboundTCPFilter(in.Env.Mesh, attrs, in.Node, in.Service, in.Push)
-		for cnum := range mutable.FilterChains {
-			mutable.FilterChains[cnum].TCP = append(mutable.FilterChains[cnum].TCP, filter)
-		}
-		return nil
-	}
+	// switch in.ListenerProtocol {
+	// case plugin.ListenerProtocolHTTP:
+	// 	filter := buildOutboundHTTPFilter(in.Env.Mesh, attrs, in.Node)
+	// 	for cnum := range mutable.FilterChains {
+	// 		mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
+	// 	}
+	// 	return nil
+	// case plugin.ListenerProtocolTCP:
+	// 	filter := buildOutboundTCPFilter(in.Env.Mesh, attrs, in.Node, in.Service, in.Push)
+	// 	for cnum := range mutable.FilterChains {
+	// 		mutable.FilterChains[cnum].TCP = append(mutable.FilterChains[cnum].TCP, filter)
+	// 	}
+	// 	return nil
+	// }
 
-	return fmt.Errorf("unknown listener type %v in mixer.OnOutboundListener", in.ListenerProtocol)
+	// return fmt.Errorf("unknown listener type %v in mixer.OnOutboundListener", in.ListenerProtocol)
 }
 
 // OnInboundListener implements the Callbacks interface method.
 func (mixerplugin) OnInboundListener(in *plugin.InputParams, mutable *plugin.MutableObjects) error {
-	if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
-		return nil
-	}
+	return nil
+	// if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
+	// 	return nil
+	// }
 
-	attrs := attributes{
-		"destination.uid":       attrUID(in.Node),
-		"destination.namespace": attrNamespace(in.Node),
-		"context.reporter.uid":  attrUID(in.Node),
-		"context.reporter.kind": attrStringValue("inbound"),
-	}
+	// attrs := attributes{
+	// 	"destination.uid":       attrUID(in.Node),
+	// 	"destination.namespace": attrNamespace(in.Node),
+	// 	"context.reporter.uid":  attrUID(in.Node),
+	// 	"context.reporter.kind": attrStringValue("inbound"),
+	// }
 
-	switch address := mutable.Listener.Address.Address.(type) {
-	case *core.Address_SocketAddress:
-		if address != nil && address.SocketAddress != nil {
-			attrs["destination.ip"] = attrIPValue(address.SocketAddress.Address)
-			switch portSpec := address.SocketAddress.PortSpecifier.(type) {
-			case *core.SocketAddress_PortValue:
-				if portSpec != nil {
-					attrs["destination.port"] = attrIntValue(int64(portSpec.PortValue))
-				}
-			}
-		}
-	}
+	// switch address := mutable.Listener.Address.Address.(type) {
+	// case *core.Address_SocketAddress:
+	// 	if address != nil && address.SocketAddress != nil {
+	// 		attrs["destination.ip"] = attrIPValue(address.SocketAddress.Address)
+	// 		switch portSpec := address.SocketAddress.PortSpecifier.(type) {
+	// 		case *core.SocketAddress_PortValue:
+	// 			if portSpec != nil {
+	// 				attrs["destination.port"] = attrIntValue(int64(portSpec.PortValue))
+	// 			}
+	// 		}
+	// 	}
+	// }
 
-	switch in.ListenerProtocol {
-	case plugin.ListenerProtocolHTTP:
-		filter := buildInboundHTTPFilter(in.Env.Mesh, attrs, in.Node)
-		for cnum := range mutable.FilterChains {
-			mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
-		}
-		return nil
-	case plugin.ListenerProtocolTCP:
-		filter := buildInboundTCPFilter(in.Env.Mesh, attrs, in.Node)
-		for cnum := range mutable.FilterChains {
-			mutable.FilterChains[cnum].TCP = append(mutable.FilterChains[cnum].TCP, filter)
-		}
-		return nil
-	}
+	// switch in.ListenerProtocol {
+	// case plugin.ListenerProtocolHTTP:
+	// 	filter := buildInboundHTTPFilter(in.Env.Mesh, attrs, in.Node)
+	// 	for cnum := range mutable.FilterChains {
+	// 		mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
+	// 	}
+	// 	return nil
+	// case plugin.ListenerProtocolTCP:
+	// 	filter := buildInboundTCPFilter(in.Env.Mesh, attrs, in.Node)
+	// 	for cnum := range mutable.FilterChains {
+	// 		mutable.FilterChains[cnum].TCP = append(mutable.FilterChains[cnum].TCP, filter)
+	// 	}
+	// 	return nil
+	// }
 
-	return fmt.Errorf("unknown listener type %v in mixer.OnOutboundListener", in.ListenerProtocol)
+	// return fmt.Errorf("unknown listener type %v in mixer.OnOutboundListener", in.ListenerProtocol)
 }
 
 // OnOutboundCluster implements the Plugin interface method.
 func (mixerplugin) OnOutboundCluster(in *plugin.InputParams, cluster *xdsapi.Cluster) {
-	if !in.Env.Mesh.SidecarToTelemetrySessionAffinity {
-		// if session affinity is not enabled, do nothing
-		return
-	}
-	withoutPort := strings.Split(in.Env.Mesh.MixerReportServer, ":")
-	if strings.Contains(cluster.Name, withoutPort[0]) {
-		// config telemetry service discovery to be strict_dns for session affinity.
-		// To enable session affinity, DNS needs to provide only one and the same telemetry instance IP
-		// (e.g. in k8s, telemetry service spec needs to have SessionAffinity: ClientIP)
-		cluster.Type = xdsapi.Cluster_STRICT_DNS
-		addr := util.BuildAddress(in.Service.Address, uint32(in.Port.Port))
-		cluster.LoadAssignment = &xdsapi.ClusterLoadAssignment{
-			ClusterName: cluster.Name,
-			Endpoints: []e.LocalityLbEndpoints{
-				{
-					LbEndpoints: []e.LbEndpoint{
-						{
-							HostIdentifier: &e.LbEndpoint_Endpoint{
-								Endpoint: &e.Endpoint{Address: &addr},
-							},
-						},
-					},
-				},
-			},
-		}
-		cluster.EdsClusterConfig = nil
-	}
+	// if !in.Env.Mesh.SidecarToTelemetrySessionAffinity {
+	// 	// if session affinity is not enabled, do nothing
+	// 	return
+	// }
+	// withoutPort := strings.Split(in.Env.Mesh.MixerReportServer, ":")
+	// if strings.Contains(cluster.Name, withoutPort[0]) {
+	// 	// config telemetry service discovery to be strict_dns for session affinity.
+	// 	// To enable session affinity, DNS needs to provide only one and the same telemetry instance IP
+	// 	// (e.g. in k8s, telemetry service spec needs to have SessionAffinity: ClientIP)
+	// 	cluster.Type = xdsapi.Cluster_STRICT_DNS
+	// 	addr := util.BuildAddress(in.Service.Address, uint32(in.Port.Port))
+	// 	cluster.LoadAssignment = &xdsapi.ClusterLoadAssignment{
+	// 		ClusterName: cluster.Name,
+	// 		Endpoints: []e.LocalityLbEndpoints{
+	// 			{
+	// 				LbEndpoints: []e.LbEndpoint{
+	// 					{
+	// 						HostIdentifier: &e.LbEndpoint_Endpoint{
+	// 							Endpoint: &e.Endpoint{Address: &addr},
+	// 						},
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	}
+	// 	cluster.EdsClusterConfig = nil
+	// }
 }
 
 // OnInboundCluster implements the Plugin interface method.
@@ -200,45 +199,45 @@ func (mixerplugin) OnInboundCluster(in *plugin.InputParams, cluster *xdsapi.Clus
 
 // OnOutboundRouteConfiguration implements the Plugin interface method.
 func (mixerplugin) OnOutboundRouteConfiguration(in *plugin.InputParams, routeConfiguration *xdsapi.RouteConfiguration) {
-	if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
-		return
-	}
-	for i := 0; i < len(routeConfiguration.VirtualHosts); i++ {
-		host := routeConfiguration.VirtualHosts[i]
-		for j := 0; j < len(host.Routes); j++ {
-			host.Routes[j] = modifyOutboundRouteConfig(in.Push, in, host.Routes[j])
-		}
-		routeConfiguration.VirtualHosts[i] = host
-	}
+	// if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
+	// 	return
+	// }
+	// for i := 0; i < len(routeConfiguration.VirtualHosts); i++ {
+	// 	host := routeConfiguration.VirtualHosts[i]
+	// 	for j := 0; j < len(host.Routes); j++ {
+	// 		host.Routes[j] = modifyOutboundRouteConfig(in.Push, in, host.Routes[j])
+	// 	}
+	// 	routeConfiguration.VirtualHosts[i] = host
+	// }
 }
 
 // OnInboundRouteConfiguration implements the Plugin interface method.
 func (mixerplugin) OnInboundRouteConfiguration(in *plugin.InputParams, routeConfiguration *xdsapi.RouteConfiguration) {
-	if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
-		return
-	}
-	is11 := util.IsProxyVersionGE11(in.Node)
-	switch in.ListenerProtocol {
-	case plugin.ListenerProtocolHTTP:
-		// copy structs in place
-		for i := 0; i < len(routeConfiguration.VirtualHosts); i++ {
-			host := routeConfiguration.VirtualHosts[i]
-			for j := 0; j < len(host.Routes); j++ {
-				route := host.Routes[j]
-				if is11 {
-					route.TypedPerFilterConfig = addTypedServiceConfig(route.TypedPerFilterConfig, buildInboundRouteConfig(in.Push, in, in.ServiceInstance))
-				} else {
-					route.PerFilterConfig = addServiceConfig(route.PerFilterConfig, buildInboundRouteConfig(in.Push, in, in.ServiceInstance))
-				}
-				host.Routes[j] = route
-			}
-			routeConfiguration.VirtualHosts[i] = host
-		}
+	// if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
+	// 	return
+	// }
+	// is11 := util.IsProxyVersionGE11(in.Node)
+	// switch in.ListenerProtocol {
+	// case plugin.ListenerProtocolHTTP:
+	// 	// copy structs in place
+	// 	for i := 0; i < len(routeConfiguration.VirtualHosts); i++ {
+	// 		host := routeConfiguration.VirtualHosts[i]
+	// 		for j := 0; j < len(host.Routes); j++ {
+	// 			route := host.Routes[j]
+	// 			if is11 {
+	// 				route.TypedPerFilterConfig = addTypedServiceConfig(route.TypedPerFilterConfig, buildInboundRouteConfig(in.Push, in, in.ServiceInstance))
+	// 			} else {
+	// 				route.PerFilterConfig = addServiceConfig(route.PerFilterConfig, buildInboundRouteConfig(in.Push, in, in.ServiceInstance))
+	// 			}
+	// 			host.Routes[j] = route
+	// 		}
+	// 		routeConfiguration.VirtualHosts[i] = host
+	// 	}
 
-	case plugin.ListenerProtocolTCP:
-	default:
-		log.Warn("Unknown listener type in mixer#OnOutboundRouteConfiguration")
-	}
+	// case plugin.ListenerProtocolTCP:
+	// default:
+	// 	log.Warn("Unknown listener type in mixer#OnOutboundRouteConfiguration")
+	// }
 }
 
 // OnInboundFilterChains is called whenever a plugin needs to setup the filter chains, including relevant filter chain configuration.
