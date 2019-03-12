@@ -107,9 +107,6 @@ var (
 	// DefaultPlugins is the default list of plugins to enable, when no plugin(s)
 	// is specified through the command line
 	DefaultPlugins = []string{
-		plugin.Authn,
-		plugin.Authz,
-		plugin.Health,
 		plugin.Mixer,
 	}
 )

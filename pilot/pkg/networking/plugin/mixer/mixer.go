@@ -15,6 +15,7 @@
 package mixer
 
 import (
+	fmt "fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -118,7 +119,18 @@ func (mixerplugin) OnOutboundListener(in *plugin.InputParams, mutable *plugin.Mu
 
 // OnInboundListener implements the Callbacks interface method.
 func (mixerplugin) OnInboundListener(in *plugin.InputParams, mutable *plugin.MutableObjects) error {
-	return nil
+	switch in.ListenerProtocol {
+	case plugin.ListenerProtocolHTTP:
+		filter := buildInboundHTTPFilter()
+		for cnum := range mutable.FilterChains {
+			mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
+		}
+		return nil
+	case plugin.ListenerProtocolTCP:
+		return nil
+	}
+
+	return fmt.Errorf("unknown listener type %v in mixer.OnOutboundListener", in.ListenerProtocol)
 	// if in.Env.Mesh.MixerCheckServer == "" && in.Env.Mesh.MixerReportServer == "" {
 	// 	return nil
 	// }
@@ -339,26 +351,102 @@ func buildOutboundHTTPFilter(mesh *meshconfig.MeshConfig, attrs attributes, node
 	return out
 }
 
-func buildInboundHTTPFilter(mesh *meshconfig.MeshConfig, attrs attributes, node *model.Proxy) *http_conn.HttpFilter {
-	config := &mccpb.HttpClientConfig{
-		DefaultDestinationService: defaultConfig,
-		ServiceConfigs: map[string]*mccpb.ServiceConfig{
-			defaultConfig: {
-				DisableCheckCalls: disablePolicyChecks(inbound, mesh, node),
+func buildInboundHTTPFilter() *http_conn.HttpFilter {
+	config := &MixerFrontendConfig{
+		DispatchSpec: []*DispatchSpec{
+			&DispatchSpec{
+				MatchExpression: "some expression",
+				Instances:       []string{"request-count"},
+				Handlers:        []string{"stackdriver"},
 			},
 		},
-		MixerAttributes: &mpb.Attributes{Attributes: attrs},
-		Transport:       buildTransport(mesh, node),
+		HandlerConfig: []*HandlerConfig{
+			&HandlerConfig{
+				Name:    "stackdriver",
+				Adapter: "adapter config descriptor",
+				Address: "stackdriveradapter:8080",
+				Params: &types.Struct{
+					Fields: map[string]*types.Value{
+						"project_id": &types.Value{
+							Kind: &types.Value_StringValue{
+								StringValue: "bpy-istio",
+							},
+						},
+						"metric_info": &types.Value{
+							Kind: &types.Value_StructValue{
+								StructValue: &types.Struct{
+									Fields: map[string]*types.Value{
+										"metric_type": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "istio.io/services/server/request_count",
+											},
+										},
+										"value": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "2",
+											},
+										},
+										"kind": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "2",
+											},
+										},
+										"name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "request-count",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		InstanceConfig: []*InstanceConfig{
+			&InstanceConfig{
+				Name:     "request-count",
+				Template: "adapter config descriptor",
+				Params: &types.Struct{
+					Fields: map[string]*types.Value{
+						"name": &types.Value{
+							Kind: &types.Value_StringValue{
+								StringValue: "request-count",
+							},
+						},
+						"value": &types.Value{
+							Kind: &types.Value_StringValue{
+								StringValue: "1",
+							},
+						},
+						"monitored_resource_type": &types.Value{
+							Kind: &types.Value_StringValue{
+								StringValue: "k8s_container",
+							},
+						},
+						"monitored_resource_dimensions": &types.Value{
+							Kind: &types.Value_StructValue{
+								StructValue: &types.Struct{
+									Fields: map[string]*types.Value{
+										"project": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "bpy-istio",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	out := &http_conn.HttpFilter{
-		Name: mixer,
+		Name: "mixer_frontend",
 	}
-
-	if util.IsProxyVersionGE11(node) {
-		out.ConfigType = &http_conn.HttpFilter_TypedConfig{TypedConfig: util.MessageToAny(config)}
-	} else {
-		out.ConfigType = &http_conn.HttpFilter_Config{Config: util.MessageToStruct(config)}
-	}
+	out.ConfigType = &http_conn.HttpFilter_Config{Config: util.MessageToStruct(config)}
 
 	return out
 }

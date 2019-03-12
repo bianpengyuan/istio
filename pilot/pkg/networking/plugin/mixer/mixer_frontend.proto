@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+package mixer;
+
+message MixerFrontendConfig {
+    map<string, string> template_descriptors = 1;
+    map<string, string> adapter_descriptors = 2;
+    repeated InstanceConfig instance_config = 3;
+    repeated HandlerConfig handler_config = 4;
+    repeated DispatchSpec dispatch_spec = 5;
+};
+
+message InstanceConfig {
+    string name = 1;
+    string template = 2;
+    // This params is a struct of key to expressions.
+    google.protobuf.Struct params = 3;
+};
+
+message HandlerConfig {
+    string name = 1;
+    string adapter = 2;
+    string address = 3;
+    google.protobuf.Struct params = 4;
+};
+
+message DispatchSpec {
+    string match_expression = 1;
+    repeated string instances = 2;
+    repeated string handlers = 3;
+};
