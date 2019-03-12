@@ -373,27 +373,35 @@ func buildInboundHTTPFilter() *http_conn.HttpFilter {
 							},
 						},
 						"metric_info": &types.Value{
-							Kind: &types.Value_StructValue{
-								StructValue: &types.Struct{
-									Fields: map[string]*types.Value{
-										"metric_type": &types.Value{
-											Kind: &types.Value_StringValue{
-												StringValue: "istio.io/services/server/request_count",
-											},
-										},
-										"value": &types.Value{
-											Kind: &types.Value_StringValue{
-												StringValue: "2",
-											},
-										},
-										"kind": &types.Value{
-											Kind: &types.Value_StringValue{
-												StringValue: "2",
-											},
-										},
-										"name": &types.Value{
-											Kind: &types.Value_StringValue{
-												StringValue: "request-count",
+							Kind: &types.Value_ListValue{
+								ListValue: &types.ListValue{
+									Values: []*types.Value{
+										&types.Value{
+											Kind: &types.Value_StructValue{
+												StructValue: &types.Struct{
+													Fields: map[string]*types.Value{
+														"metric_type": &types.Value{
+															Kind: &types.Value_StringValue{
+																StringValue: "istio.io/service/server/request_count",
+															},
+														},
+														"value": &types.Value{
+															Kind: &types.Value_StringValue{
+																StringValue: "2",
+															},
+														},
+														"kind": &types.Value{
+															Kind: &types.Value_StringValue{
+																StringValue: "3",
+															},
+														},
+														"name": &types.Value{
+															Kind: &types.Value_StringValue{
+																StringValue: "request-count",
+															},
+														},
+													},
+												},
 											},
 										},
 									},
@@ -429,9 +437,34 @@ func buildInboundHTTPFilter() *http_conn.HttpFilter {
 							Kind: &types.Value_StructValue{
 								StructValue: &types.Struct{
 									Fields: map[string]*types.Value{
-										"project": &types.Value{
+										"project_id": &types.Value{
 											Kind: &types.Value_StringValue{
 												StringValue: "bpy-istio",
+											},
+										},
+										"location": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "",
+											},
+										},
+										"cluster_name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "",
+											},
+										},
+										"namespace_name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "default",
+											},
+										},
+										"pod_name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "a_pod",
+											},
+										},
+										"container_name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: "b_container",
 											},
 										},
 									},
