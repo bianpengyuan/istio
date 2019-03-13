@@ -121,7 +121,7 @@ func (mixerplugin) OnOutboundListener(in *plugin.InputParams, mutable *plugin.Mu
 func (mixerplugin) OnInboundListener(in *plugin.InputParams, mutable *plugin.MutableObjects) error {
 	switch in.ListenerProtocol {
 	case plugin.ListenerProtocolHTTP:
-		filter := buildInboundHTTPFilter()
+		filter := buildInboundHTTPFilter(in)
 		for cnum := range mutable.FilterChains {
 			mutable.FilterChains[cnum].HTTP = append(mutable.FilterChains[cnum].HTTP, filter)
 		}
@@ -351,7 +351,8 @@ func buildOutboundHTTPFilter(mesh *meshconfig.MeshConfig, attrs attributes, node
 	return out
 }
 
-func buildInboundHTTPFilter() *http_conn.HttpFilter {
+func buildInboundHTTPFilter(in *plugin.InputParams) *http_conn.HttpFilter {
+	pod, namespace := getPodIDAndNamespace(in.Node.ID)
 	config := &MixerFrontendConfig{
 		DispatchSpec: []*DispatchSpec{
 			&DispatchSpec{
@@ -433,6 +434,19 @@ func buildInboundHTTPFilter() *http_conn.HttpFilter {
 								StringValue: "k8s_container",
 							},
 						},
+						"dimensions": &types.Value{
+							Kind: &types.Value_StructValue{
+								StructValue: &types.Struct{
+									Fields: map[string]*types.Value{
+										"destination_service_name": &types.Value{
+											Kind: &types.Value_StringValue{
+												StringValue: string(in.Node.ServiceInstances[0].Service.Hostname),
+											},
+										},
+									},
+								},
+							},
+						},
 						"monitored_resource_dimensions": &types.Value{
 							Kind: &types.Value_StructValue{
 								StructValue: &types.Struct{
@@ -444,27 +458,27 @@ func buildInboundHTTPFilter() *http_conn.HttpFilter {
 										},
 										"location": &types.Value{
 											Kind: &types.Value_StringValue{
-												StringValue: "",
+												StringValue: "us-central1-a",
 											},
 										},
 										"cluster_name": &types.Value{
 											Kind: &types.Value_StringValue{
-												StringValue: "",
+												StringValue: "mixer-in-proxy",
 											},
 										},
 										"namespace_name": &types.Value{
 											Kind: &types.Value_StringValue{
-												StringValue: "default",
+												StringValue: namespace,
 											},
 										},
 										"pod_name": &types.Value{
 											Kind: &types.Value_StringValue{
-												StringValue: "a_pod",
+												StringValue: pod,
 											},
 										},
 										"container_name": &types.Value{
 											Kind: &types.Value_StringValue{
-												StringValue: "b_container",
+												StringValue: "",
 											},
 										},
 									},
@@ -482,6 +496,11 @@ func buildInboundHTTPFilter() *http_conn.HttpFilter {
 	out.ConfigType = &http_conn.HttpFilter_Config{Config: util.MessageToStruct(config)}
 
 	return out
+}
+
+func getPodIDAndNamespace(nodeID string) (string, string) {
+	parts := strings.Split(nodeID, ".")
+	return parts[0], parts[1]
 }
 
 func modifyOutboundRouteConfig(push *model.PushContext, in *plugin.InputParams, httpRoute route.Route) route.Route {
