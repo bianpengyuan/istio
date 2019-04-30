@@ -97,6 +97,9 @@ var (
 
 	// ServiceAccountFilePath is the helm service account file.
 	ServiceAccountFilePath = path.Join(ChartsDir, "helm-service-account.yaml")
+
+	// HttpbinRoot is the root folder for the httpbin samples
+	HttpbinRoot = path.Join(IstioRoot, "samples/httpbin")
 )
 
 func getDefaultIstioTop() string {
