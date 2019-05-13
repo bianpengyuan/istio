@@ -216,12 +216,13 @@ func buildAuthToken(token []byte, tlsCfg *policypb.Tls) (*headerToken, error) {
 func buildPerRPCCredentials(tlsCfg *policypb.Tls) (credentials.PerRPCCredentials, error) {
 	switch tlsCfg.TokenSource.(type) {
 	case *policypb.Tls_Oauth:
-		ts, err := buildOAuthToken(tlsCfg.GetOauth())
-		if err != nil {
-			return nil, err
-		}
+		// ts, err := buildOAuthToken(tlsCfg.GetOauth())
+		gceCred := oauth.NewComputeEngine()
+		// if err != nil {
+		// 	return nil, err
+		// }
 		// nolint: govet
-		return oauth.TokenSource{ts}, nil
+		return gceCred, nil
 	case *policypb.Tls_TokenPath:
 		// read token from given path
 		tp := tlsCfg.GetTokenPath()
