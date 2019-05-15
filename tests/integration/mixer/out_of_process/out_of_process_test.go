@@ -17,11 +17,11 @@ package out_of_process_adapter_test
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
 
-	"istio.io/istio/pkg/test"
 	"istio.io/istio/pkg/test/framework"
 	"istio.io/istio/pkg/test/framework/components/environment"
 	"istio.io/istio/pkg/test/framework/components/galley"
@@ -47,159 +47,164 @@ var (
 )
 
 func TestRouteDirective(t *testing.T) {
-	ctx := framework.NewContext(t)
-	defer ctx.Done(t)
+	framework.
+		NewTest(t).
+		RequiresEnvironment(environment.Kube).
+		Run(func(ctx framework.TestContext) {
+			httpbinNs, err := namespace.New(ctx, "httpbin-test", true)
+			istioSystemNs := namespace.ClaimOrFail(t, ctx, "istio-system")
 
-	ctx.RequireOrSkip(t, environment.Kube)
-	httpbinNs, err := namespace.New(ctx, "httpbin-test", true)
-	istioSystemNs := namespace.ClaimOrFail(t, ctx, "istio-system")
+			g := galley.NewOrFail(t, ctx, galley.Config{})
+			_ = mixer.NewOrFail(t, ctx, mixer.Config{Galley: g})
+			_ = httpbin.DeployOrFail(t, ctx, httpbin.Config{Namespace: httpbinNs})
+			be := policybackend.NewOrFail(t, ctx)
 
-	g := galley.NewOrFail(t, ctx, galley.Config{})
-	_ = mixer.NewOrFail(t, ctx, mixer.Config{Galley: g})
-	_ = httpbin.DeployOrFail(t, ctx, httpbin.Config{Namespace: httpbinNs})
-	be := policybackend.NewOrFail(t, ctx)
-
-	// Get out of process adapter related config, which includes dyanmic template for keyval and checknothing,
-	// and dynamic adapter config for policy backend.
-	oopConfig, err := readOOPConfig()
-	if err != nil {
-		t.Fatalf("unable to read out of process adapter config: %v", err)
-	}
-
-	// Apply all configs needed by out of process adapter, which includes all needed dynamic templates,
-	// adapter config, instances and handlers.
-	g.ApplyConfigOrFail(t, istioSystemNs,
-		oopConfig,
-		testOOPKeyValInstace,
-		be.CreateConfigSnippet("policy-backend", istioSystemNs.Name(), policybackend.OutOfProcess),
-	)
-	g.ApplyConfigOrFail(t, httpbinNs,
-		httpbin.NetworkingHttpbinGateway.LoadWithNamespaceOrFail(t, httpbinNs.Name()))
-	ing := ingress.NewOrFail(t, ctx, ingress.Config{Istio: ist})
-
-	var response ingress.CallResponse
-
-	t.Log("visit httpbin")
-	retry.UntilSuccessOrFail(t, func() error {
-		response, err = ing.Call("/")
-		if err != nil {
-			return fmt.Errorf("unable to connect to httpbin: %v", err)
-		}
-		return nil
-	}, retry.Delay(3*time.Second), retry.Timeout(30*time.Second))
-
-	// Test rule that adds header.
-	t.Log("apply rule to add 'group' header")
-	g.ApplyConfigOrFail(t, istioSystemNs, testOOPKeyValGroupRule)
-
-	// Retry visiting httpbin until gets "user-group" header
-	retry.UntilSuccessOrFail(t, func() error {
-		response, err = ing.CallWithHeaders("/headers", map[string]string{"user": "jason"})
-		if err != nil {
-			return fmt.Errorf("unable to connect to httpbin: %v", err)
-		}
-		if response.Code != statusOK {
-			return fmt.Errorf("visit returns non-ok code: %v", response.Code)
-		}
-
-		var result, headers map[string]interface{}
-		if json.Unmarshal([]byte(response.Body), &result) != nil {
-			return fmt.Errorf("cannot unmarshal json string %v", response.Body)
-		}
-		if _, ok := result["headers"]; !ok {
-			return fmt.Errorf("cannot find headers in httpbin response: %v", response.Body)
-		}
-		headers = result["headers"].(map[string]interface{})
-		for key, val := range headers {
-			if strings.EqualFold(key, "user-group") && strings.EqualFold(val.(string), "admin") {
-				return nil
+			// Get out of process adapter related config, which includes dyanmic template for keyval and checknothing,
+			// and dynamic adapter config for policy backend.
+			oopConfig, err := readOOPConfig()
+			if err != nil {
+				t.Fatalf("unable to read out of process adapter config: %v", err)
 			}
-		}
-		return fmt.Errorf("cannot find user-group header in request headers: %v", headers)
-	}, retry.Delay(3*time.Second), retry.Timeout(40*time.Second))
 
-	t.Log("find user-group: admin header")
-	g.DeleteConfigOrFail(t, istioSystemNs, testOOPKeyValGroupRule)
+			// Apply all configs needed by out of process adapter, which includes all needed dynamic templates,
+			// adapter config, instances and handlers.
+			g.ApplyConfigOrFail(t, istioSystemNs,
+				oopConfig,
+				testOOPKeyValInstace,
+				be.CreateConfigSnippet("policy-backend", istioSystemNs.Name(), policybackend.OutOfProcess),
+			)
+			g.ApplyConfigOrFail(t, httpbinNs,
+				httpbin.NetworkingHttpbinGateway.LoadWithNamespaceOrFail(t, httpbinNs.Name()))
+			ing := ingress.NewOrFail(t, ctx, ingress.Config{Istio: ist})
 
-	// Test header editing and route directive.
-	t.Log("apply rule to edit path header")
-	g.ApplyConfigOrFail(t, istioSystemNs, testOOPKeyValPathRule)
-	retry.UntilSuccessOrFail(t, func() error {
-		response, err = ing.Call("/headers")
-		if err != nil {
-			return fmt.Errorf("unable to connect to httpbin: %v", err)
-		}
-		if response.Code != statusTeapot {
-			return fmt.Errorf("httpbin does not return teapot: %v", response.Code)
-		}
-		return nil
-	}, retry.Delay(3*time.Second), retry.Timeout(40*time.Second))
-	t.Log("httpbin returns status 418")
-	g.DeleteConfigOrFail(t, istioSystemNs, testOOPKeyValPathRule)
+			var response ingress.CallResponse
+
+			t.Log("visit httpbin")
+			retry.UntilSuccessOrFail(t, func() error {
+				response, err = ing.Call("/")
+				if err != nil {
+					return fmt.Errorf("unable to connect to httpbin: %v", err)
+				}
+				if response.Code != 200 {
+					return fmt.Errorf("get non-ok response code %v", response.Code)
+				}
+				return nil
+			}, retry.Delay(3*time.Second), retry.Timeout(30*time.Second))
+
+			// Test rule that adds header.
+			t.Log("apply rule to add 'group' header")
+			g.ApplyConfigOrFail(t, istioSystemNs, testOOPKeyValGroupRule)
+
+			// Retry visiting httpbin until gets "user-group" header
+			retry.UntilSuccessOrFail(t, func() error {
+				response, err = ing.CallWithHeaders("/headers", map[string]string{"user": "jason"})
+				if err != nil {
+					return fmt.Errorf("unable to connect to httpbin: %v", err)
+				}
+				if response.Code != statusOK {
+					return fmt.Errorf("visit returns non-ok code: %v", response.Code)
+				}
+
+				var result, headers map[string]interface{}
+				if json.Unmarshal([]byte(response.Body), &result) != nil {
+					return fmt.Errorf("cannot unmarshal json string %v", response.Body)
+				}
+				if _, ok := result["headers"]; !ok {
+					return fmt.Errorf("cannot find headers in httpbin response: %v", response.Body)
+				}
+				headers = result["headers"].(map[string]interface{})
+				for key, val := range headers {
+					if strings.EqualFold(key, "user-group") && strings.EqualFold(val.(string), "admin") {
+						return nil
+					}
+				}
+				return fmt.Errorf("cannot find user-group header in request headers: %v", headers)
+			}, retry.Delay(3*time.Second), retry.Timeout(80*time.Second))
+
+			t.Log("find user-group: admin header")
+			g.DeleteConfigOrFail(t, istioSystemNs, testOOPKeyValGroupRule)
+
+			// Test header editing and route directive.
+			t.Log("apply rule to edit path header")
+			g.ApplyConfigOrFail(t, istioSystemNs, testOOPKeyValPathRule)
+			retry.UntilSuccessOrFail(t, func() error {
+				response, err = ing.CallWithHeaders("/headers", map[string]string{"user": "jason"})
+				if err != nil {
+					return fmt.Errorf("unable to connect to httpbin: %v", err)
+				}
+				if response.Code != statusTeapot {
+					return fmt.Errorf("httpbin does not return teapot: %v", response.Code)
+				}
+				return nil
+			}, retry.Delay(3*time.Second), retry.Timeout(80*time.Second))
+			t.Log("httpbin returns status 418")
+			g.DeleteConfigOrFail(t, istioSystemNs, testOOPKeyValPathRule)
+		})
 }
 
 func TestCheck(t *testing.T) {
-	ctx := framework.NewContext(t)
-	defer ctx.Done(t)
+	framework.
+		NewTest(t).
+		Run(func(ctx framework.TestContext) {
+			gal := galley.NewOrFail(t, ctx, galley.Config{})
+			mxr := mixer.NewOrFail(t, ctx, mixer.Config{
+				Galley: gal,
+			})
+			be := policybackend.NewOrFail(t, ctx)
 
-	gal := galley.NewOrFail(t, ctx, galley.Config{})
-	mxr := mixer.NewOrFail(t, ctx, mixer.Config{
-		Galley: gal,
-	})
-	be := policybackend.NewOrFail(t, ctx)
+			ns := namespace.NewOrFail(t, ctx, "testcheck-deny-oop", false)
+			istioSystemNs := namespace.ClaimOrFail(t, ctx, "istio-system")
 
-	ns := namespace.NewOrFail(t, ctx, "testcheck-deny-oop", false)
-	istioSystemNs := namespace.ClaimOrFail(t, ctx, "istio-system")
+			// Get out of process adapter related config, which includes dyanmic template for keyval and checknothing,
+			// and dynamic adapter config for policy backend.
+			oopConfig, err := readOOPConfig()
+			if err != nil {
+				t.Fatalf("cannot read out of process config file: %v", err)
+			}
 
-	// Get out of process adapter related config, which includes dyanmic template for keyval and checknothing,
-	// and dynamic adapter config for policy backend.
-	oopConfig, err := readOOPConfig()
-	if err != nil {
-		t.Fatalf("cannot read out of process config file: %v", err)
-	}
+			gal.ApplyConfigOrFail(
+				t,
+				istioSystemNs,
+				oopConfig,
+				testOOPCheckConfig,
+				be.CreateConfigSnippet("", "", policybackend.OutOfProcess))
 
-	gal.ApplyConfigOrFail(
-		t,
-		istioSystemNs,
-		oopConfig,
-		testOOPCheckConfig,
-		be.CreateConfigSnippet("", "", policybackend.OutOfProcess))
+			retry.UntilSuccessOrFail(t, func() error {
+				result := mxr.Check(t, map[string]interface{}{
+					"context.protocol":      "http",
+					"destination.name":      "someworkload",
+					"destination.namespace": ns.Name(),
+					"response.time":         time.Now(),
+					"request.time":          time.Now(),
+					"destination.service":   `svc.` + ns.Name(),
+					"origin.ip":             []byte{1, 2, 3, 4},
+				})
 
-	retry.UntilSuccessOrFail(t, func() error {
-		result := mxr.Check(t, map[string]interface{}{
-			"context.protocol":      "http",
-			"destination.name":      "someworkload",
-			"destination.namespace": ns.Name(),
-			"response.time":         time.Now(),
-			"request.time":          time.Now(),
-			"destination.service":   `svc.` + ns.Name(),
-			"origin.ip":             []byte{1, 2, 3, 4},
+				if result.Succeeded() {
+					return fmt.Errorf("check should not pass: %v", result.Raw)
+				}
+
+				return nil
+			}, retry.Timeout(time.Second*40))
 		})
-
-		if result.Succeeded() {
-			return fmt.Errorf("check should not pass: %v", result.Raw)
-		}
-
-		return nil
-	}, retry.Timeout(time.Second*40))
 }
 
 // readOOPConfig reads out of process adapter config, which includes dyanmic template for keyval and checknothing,
 // and dynamic adapter config for policy backend.
 func readOOPConfig() (string, error) {
 	oopConfig := ""
-	if tmpl, err := test.ReadConfigFile(checknothingTmpl); err == nil {
-		oopConfig += "\n" + tmpl
+	if tmpl, err := ioutil.ReadFile(checknothingTmpl); err == nil {
+		oopConfig += "\n" + string(tmpl)
 	} else {
 		return "", err
 	}
-	if tmpl, err := test.ReadConfigFile(keyvalTmpl); err == nil {
-		oopConfig += "\n" + tmpl
+	if tmpl, err := ioutil.ReadFile(keyvalTmpl); err == nil {
+		oopConfig += "\n" + string(tmpl)
 	} else {
 		return "", err
 	}
-	if cfg, err := test.ReadConfigFile(adapterConfig); err == nil {
-		oopConfig += "\n" + cfg
+	if cfg, err := ioutil.ReadFile(adapterConfig); err == nil {
+		oopConfig += "\n" + string(cfg)
 	} else {
 		return "", err
 	}

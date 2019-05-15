@@ -15,13 +15,13 @@
 package httpbin
 
 import (
+	"io/ioutil"
 	"path"
 	"strings"
 	"testing"
 
 	"istio.io/istio/pkg/test/util/yml"
 
-	"istio.io/istio/pkg/test"
 	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/pkg/test/scopes"
 )
@@ -39,10 +39,11 @@ func (l ConfigFile) LoadWithNamespaceOrFail(t testing.TB, namespace string) stri
 	t.Helper()
 	p := path.Join(env.HttpbinRoot, string(l))
 
-	content, err := test.ReadConfigFile(p)
+	fc, err := ioutil.ReadFile(p)
 	if err != nil {
 		t.Fatalf("unable to load config %s at %v, err:%v", l, p, err)
 	}
+	content := string(fc)
 	if namespace != "" {
 		content, err = yml.ApplyNamespace(content, namespace)
 		if err != nil {
