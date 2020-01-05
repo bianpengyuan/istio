@@ -15,10 +15,10 @@
 package stackdriver
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 
 	environ "istio.io/istio/pkg/test/env"
 	"istio.io/istio/pkg/test/framework/components/environment/kube"
@@ -27,14 +27,13 @@ import (
 	testKube "istio.io/istio/pkg/test/kube"
 	"istio.io/istio/pkg/test/scopes"
 
-	logging "google.golang.org/genproto/googleapis/logging/v2"
+	jsonpb "github.com/golang/protobuf/jsonpb"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
-	"google.golang.org/grpc"
 )
 
 const (
 	stackdriverNamespace = "istio-stackdriver"
-	stackdriverPort      = 80
+	stackdriverPort      = 8091
 )
 
 var (
@@ -106,18 +105,19 @@ func newKube(ctx resource.Context) (Instance, error) {
 }
 
 func (c *kubeComponent) ListTimeSeries() ([]*monitoringpb.TimeSeries, error) {
-	conn, err := grpc.Dial(c.forwarder.Address(), grpc.WithInsecure())
+	resp, err := http.Get("http://" + c.forwarder.Address() + "/timeseries")
 	if err != nil {
-		return nil, err
+		return []*monitoringpb.TimeSeries{}, err
 	}
-	defer conn.Close()
-	mc := monitoringpb.NewMetricServiceClient(conn)
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return []*monitoringpb.TimeSeries{}, err
 	}
-	r, err := mc.ListTimeSeries(context.Background(), &monitoringpb.ListTimeSeriesRequest{})
+	var r monitoringpb.ListTimeSeriesResponse
+	err = jsonpb.UnmarshalString(string(body), &r)
 	if err != nil {
-		return nil, err
+		return []*monitoringpb.TimeSeries{}, err
 	}
 	var ret []*monitoringpb.TimeSeries
 	for _, t := range r.TimeSeries {
@@ -129,23 +129,6 @@ func (c *kubeComponent) ListTimeSeries() ([]*monitoringpb.TimeSeries, error) {
 		ret = append(ret, t)
 	}
 	return ret, nil
-}
-
-func (c *kubeComponent) ListLogEntries() ([]*logging.LogEntry, error) {
-	conn, err := grpc.Dial(c.forwarder.Address(), grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	lc := logging.NewLoggingServiceV2Client(conn)
-	if err != nil {
-		return nil, err
-	}
-	r, err := lc.ListLogEntries(context.Background(), &logging.ListLogEntriesRequest{})
-	if err != nil {
-		return nil, err
-	}
-	return r.Entries, nil
 }
 
 func (c *kubeComponent) ID() resource.ID {
