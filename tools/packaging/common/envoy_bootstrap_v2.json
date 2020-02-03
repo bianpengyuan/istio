@@ -618,9 +618,12 @@
      }
   }}
   {{ end }}
-  {{ if or .envoy_metrics_service_address .statsd }}
   ,
   "stats_sinks": [
+    {
+      "name": "envoy.stackdriver_stats_sink",
+      "config": {}
+    },
     {{ if .envoy_metrics_service_address }}
     {
       "name": "envoy.metrics_service",
@@ -644,7 +647,6 @@
     },
     {{ end }}
   ]
-  {{ end }}
   {{ if .outlier_log_path }}
   ,
   "cluster_manager": {
