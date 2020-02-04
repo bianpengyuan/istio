@@ -65,6 +65,7 @@ type Plugin struct {
 func CreateTokenManagerPlugin(trustDomain string, gCPProjectNumber, gKEClusterURL string) (*Plugin, error) {
 	caCertPool, err := x509.SystemCertPool()
 	if err != nil {
+		fmt.Println(err)
 		pluginLog.Errorf("Failed to get SystemCertPool: %v", err)
 		return nil, err
 	}

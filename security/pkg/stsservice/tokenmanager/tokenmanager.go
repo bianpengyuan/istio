@@ -52,21 +52,30 @@ type GcpProjectInfo struct {
 }
 
 func getGcpProjectNumber() GcpProjectInfo {
+	fmt.Println("try to get project number")
 	info := GcpProjectInfo{}
 	if platform.IsGCP() {
 		md := platform.NewGCP().Metadata()
+		fmt.Println("is on gcp")
+		fmt.Println(md)
 		if projectNum, found := md[platform.GCPProjectNumber]; found {
+			fmt.Println("project num " + projectNum)
 			info.Number = projectNum
 		}
 		if projectID, found := md[platform.GCPProject]; found {
+			fmt.Println("projectID " + projectID)
 			info.id = projectID
 		}
 		if clusterName, found := md[platform.GCPCluster]; found {
+			fmt.Println("cluster name " + clusterName)
 			info.cluster = clusterName
 		}
 		if clusterLocation, found := md[platform.GCPLocation]; found {
+			fmt.Println("cluster location " + clusterLocation)
 			info.clusterLocation = clusterLocation
 		}
+	} else {
+		fmt.Println("is not on gcp")
 	}
 	return info
 }
@@ -74,15 +83,17 @@ func getGcpProjectNumber() GcpProjectInfo {
 // CreateTokenManager creates a token manager with specified type and returns
 // that token manager
 func CreateTokenManager(tokenManagerType string, config Config) stsservice.TokenManager {
+	fmt.Println("create token manager " + tokenManagerType)
 	tm := &TokenManager{
 		plugin: nil,
 	}
 	switch tokenManagerType {
 	case GoogleTokenExchange:
+		fmt.Println("is google token exchange")
 		if projectInfo := getGcpProjectNumber(); len(projectInfo.Number) > 0 {
 			gKEClusterURL := fmt.Sprintf("https://container.googleapis.com/v1/projects/%s/locations/%s/clusters/%s",
 				projectInfo.id, projectInfo.clusterLocation, projectInfo.cluster)
-			if p, err := google.CreateTokenManagerPlugin(config.TrustDomain, projectInfo.Number, gKEClusterURL); err != nil {
+			if p, err := google.CreateTokenManagerPlugin(config.TrustDomain, projectInfo.Number, gKEClusterURL); err == nil {
 				tm.plugin = p
 			}
 		}
