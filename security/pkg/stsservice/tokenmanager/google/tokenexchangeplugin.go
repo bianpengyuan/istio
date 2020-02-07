@@ -46,8 +46,7 @@ const (
 var (
 	pluginLog              = log.RegisterScope("token", "token manager plugin debugging", 0)
 	federatedTokenEndpoint = "https://securetoken.googleapis.com/v1/identitybindingtoken"
-	accessTokenEndpoint    = "https://iamcredentials.googleapis.com/v1/projects/-/" +
-		"serviceAccounts/service-%s@gcp-sa-meshdataplane.iam.gserviceaccount.com:generateAccessToken"
+	accessTokenEndpoint    =  "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/service-%s-gcp-sa-me@mixologist-142215.iam.gserviceaccount.com:generateAccessToken"	
 )
 
 // Plugin supports token exchange with Google OAuth 2.0 authorization server.
@@ -94,7 +93,7 @@ type federatedTokenResponse struct {
 
 // GenerateToken takes STS request parameters and fetches token, returns StsResponseParameters in JSON.
 func (p *Plugin) ExchangeToken(parameters stsservice.StsRequestParameters) ([]byte, error) {
-	pluginLog.Debugf("Start to fetch token with STS request parameters: %v", parameters)
+	pluginLog.Infof("Start to fetch token with STS request parameters: %v", parameters)
 	ftResp, err := p.fetchFederatedToken(parameters)
 	if err != nil {
 		return nil, err
@@ -135,9 +134,9 @@ func (p *Plugin) constructFederatedTokenRequest(parameters stsservice.StsRequest
 	jsonQuery, _ := json.Marshal(query)
 	req, _ := http.NewRequest("POST", federatedTokenEndpoint, bytes.NewBuffer(jsonQuery))
 	req.Header.Set("Content-Type", contentType)
-	if pluginLog.DebugEnabled() {
-		reqDump, _ := httputil.DumpRequest(req, false)
-		pluginLog.Debugf("Prepared federated token request: \n%s", string(reqDump))
+	if pluginLog.InfoEnabled() {
+		reqDump, _ := httputil.DumpRequest(req, true)
+		pluginLog.Infof("Prepared federated token request: \n%s", string(reqDump))
 	} else {
 		pluginLog.Info("Prepared federated token request")
 	}
@@ -164,9 +163,9 @@ func (p *Plugin) fetchFederatedToken(parameters stsservice.StsRequestParameters)
 	// resp should not be nil.
 	defer resp.Body.Close()
 
-	if pluginLog.DebugEnabled() {
-		respDump, _ := httputil.DumpResponse(resp, false)
-		pluginLog.Debugf("Received federated token response after %s: \n%s",
+	if pluginLog.InfoEnabled() {
+		respDump, _ := httputil.DumpResponse(resp, true)
+		pluginLog.Infof("Received federated token response after %s: \n%s",
 			timeElapsed.String(), string(respDump))
 	} else {
 		pluginLog.Infof("Received federated token response after %s", timeElapsed.String())
@@ -248,14 +247,15 @@ func (p *Plugin) constructGenerateAccessTokenRequest(fResp *federatedTokenRespon
 
 	jsonQuery, _ := json.Marshal(query)
 	endpoint := fmt.Sprintf(accessTokenEndpoint, p.gCPProjectNumber)
+	fmt.Println("access token endpoint is " + endpoint)
 	req, _ := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonQuery))
 	req.Header.Add("Content-Type", contentType)
 	req.Header.Add("Authorization", "Bearer "+fResp.AccessToken)
-	if pluginLog.DebugEnabled() {
+	if pluginLog.InfoEnabled() {
 		dumpReq := req
-		dumpReq.Header.Set("Authorization", "redacted")
-		reqDump, _ := httputil.DumpRequest(dumpReq, false)
-		pluginLog.Debugf("Prepared access token request: \n%s", string(reqDump))
+		// dumpReq.Header.Set("Authorization", "redacted")
+		reqDump, _ := httputil.DumpRequest(dumpReq, true)
+		pluginLog.Infof("Prepared access token request: \n%s", string(reqDump))
 	} else {
 		pluginLog.Info("Prepared access token request")
 	}
@@ -278,9 +278,9 @@ func (p *Plugin) fetchAccessToken(federatedToken *federatedTokenResponse) (*acce
 	}
 	defer resp.Body.Close()
 
-	if pluginLog.DebugEnabled() {
-		respDump, _ := httputil.DumpResponse(resp, false)
-		pluginLog.Debugf("Received access token response after %s: \n%s",
+	if pluginLog.InfoEnabled() {
+		respDump, _ := httputil.DumpResponse(resp, true)
+		pluginLog.Infof("Received access token response after %s: \n%s",
 			timeElapsed.String(), string(respDump))
 	} else {
 		pluginLog.Infof("Received access token response after %s", timeElapsed.String())
@@ -295,7 +295,7 @@ func (p *Plugin) fetchAccessToken(federatedToken *federatedTokenResponse) (*acce
 		pluginLog.Errora("access token response does not have access token", string(body))
 		return respData, errors.New("access token response does not have access token. " + string(body))
 	}
-	pluginLog.Debug("successfully exchanged an access token")
+	pluginLog.Info("successfully exchanged an access token")
 	p.tokens.Store(accessToken, stsservice.TokenInfo{
 		TokenType:  accessToken,
 		IssueTime:  time.Now().String(),
@@ -321,8 +321,7 @@ func (p *Plugin) generateSTSResp(atResp *accessTokenResponse) ([]byte, error) {
 		ExpiresIn:       expireInSec,
 	}
 	statusJSON, err := json.MarshalIndent(stsRespParam, "", " ")
-	if pluginLog.DebugEnabled() {
-		stsRespParam.AccessToken = "redacted"
+	if pluginLog.InfoEnabled() {
 		pluginLog.Infof("Populated STS response parameters: %+v", stsRespParam)
 	}
 	return statusJSON, err
