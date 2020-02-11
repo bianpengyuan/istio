@@ -48,6 +48,9 @@ ENV ISTIO_META_ISTIO_PROXY_SHA $proxy_version
 # Environment variable indicating the exact build, for debugging
 ENV ISTIO_META_ISTIO_VERSION $istio_version
 
+# ENV GRPC_TRACE all
+# ENV GRPC_VERBOSITY debug
+
 COPY pilot-agent /usr/local/bin/pilot-agent
 
 COPY envoy_pilot.yaml.tmpl /etc/istio/proxy/envoy_pilot.yaml.tmpl

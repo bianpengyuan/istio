@@ -6978,6 +6978,16 @@ spec:
           env:
           - name: JWT_POLICY
             value: {{ .Values.global.jwtPolicy }}
+          - name: CA_ADDR
+            value: meshca.googleapis.com:443
+          - name: PLUGINS
+            value: GoogleTokenExchange
+          - name: CA_PROVIDER
+            value: GoogleCA
+          - name: GKE_CLUSTER_URL
+            value: https://container.googleapis.com/v1/projects/mixologist-142215/locations/us-central1-a/clusters/bpy-sts-sd-test
+          - name: TRUST_DOMAIN
+            value: mixologist-142215.svc.id.goog
           - name: PILOT_CERT_PROVIDER
             value: {{ .Values.global.pilotCertProvider }}
           - name: NODE_NAME
@@ -8053,8 +8063,16 @@ spec:
           - name: "ISTIO_META_USER_SDS"
             value: "true"
           - name: CA_ADDR
-            value: istio-pilot.{{ .Values.global.configNamespace }}.svc:15012
+            value: meshca.googleapis.com:443
 {{- end }}
+          - name: PLUGINS
+            value: GoogleTokenExchange
+          - name: CA_PROVIDER
+            value: GoogleCA
+          - name: GKE_CLUSTER_URL
+            value: https://container.googleapis.com/v1/projects/mixologist-142215/locations/us-central1-a/clusters/bpy-sts-sd-test
+          - name: TRUST_DOMAIN
+            value: mixologist-142215.svc.id.goog
           - name: NODE_NAME
             valueFrom:
               fieldRef:
@@ -12061,10 +12079,18 @@ template: |
     # Temp, pending PR to make it default or based on the istiodAddr env
     - name: CA_ADDR
     {{- if .Values.global.configNamespace }}
-      value: istio-pilot.{{ .Values.global.configNamespace }}.svc:15012
+      value: meshca.googleapis.com:443
     {{- else }}
-      value: istio-pilot.istio-system.svc:15012
+      value: meshca.googleapis.com:443
     {{- end }}
+    - name: PLUGINS
+      value: GoogleTokenExchange
+    - name: CA_PROVIDER
+      value: GoogleCA
+    - name: GKE_CLUSTER_URL
+      value: https://container.googleapis.com/v1/projects/mixologist-142215/locations/us-central1-a/clusters/bpy-sts-sd-test
+    - name: TRUST_DOMAIN
+      value: mixologist-142215.svc.id.goog
     - name: POD_NAME
       valueFrom:
         fieldRef:

@@ -68,6 +68,8 @@ spec:
       labels:
         app: details
         version: v1
+      annotations:
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-details
       containers:
@@ -119,6 +121,8 @@ spec:
       labels:
         app: ratings
         version: v1
+      annotations:
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-ratings
       containers:
@@ -170,6 +174,8 @@ spec:
       labels:
         app: reviews
         version: v1
+      annotations:
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-reviews
       containers:
@@ -210,6 +216,8 @@ spec:
       labels:
         app: reviews
         version: v2
+      annotations:
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-reviews
       containers:
@@ -250,6 +258,8 @@ spec:
       labels:
         app: reviews
         version: v3
+      annotations:
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-reviews
       containers:
@@ -315,7 +325,7 @@ spec:
         app: productpage
         version: v1
       annotations:
-        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:sts-test-11"
+        sidecar.istio.io/proxyImage: "gcr.io/mixologist-142215/proxyv2:021001"
     spec:
       serviceAccountName: bookinfo-productpage
       containers:

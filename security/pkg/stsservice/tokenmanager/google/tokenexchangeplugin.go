@@ -46,7 +46,8 @@ const (
 var (
 	pluginLog              = log.RegisterScope("token", "token manager plugin debugging", 0)
 	federatedTokenEndpoint = "https://securetoken.googleapis.com/v1/identitybindingtoken"
-	accessTokenEndpoint    =  "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/service-%s-gcp-sa-me@mixologist-142215.iam.gserviceaccount.com:generateAccessToken"	
+        accessTokenEndpoint    = "https://iamcredentials.googleapis.com/v1/projects/-/" +
+                "serviceAccounts/service-%s@gcp-sa-meshdataplane.iam.gserviceaccount.com:generateAccessToken"
 )
 
 // Plugin supports token exchange with Google OAuth 2.0 authorization server.
