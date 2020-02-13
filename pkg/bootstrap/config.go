@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,6 +90,7 @@ type Config struct {
 	SDSTokenPath        string
 	ControlPlaneAuth    bool
 	DisableReportCalls  bool
+	StsPort             int
 }
 
 // newTemplateParams creates a new template configuration for the given configuration.
@@ -100,7 +102,11 @@ func (cfg Config) toTemplateParams() (map[string]interface{}, error) {
 		cfg.PilotSubjectAltName = defaultPilotSAN()
 	}
 	if cfg.PlatEnv == nil {
-		cfg.PlatEnv = platform.NewGCP()
+		if platform.IsGCP() {
+			cfg.PlatEnv = platform.NewGCP()
+		} else {
+			cfg.PlatEnv = &platform.Unknown{}
+		}
 	}
 
 	// Remove duplicates from the node IPs.
@@ -117,11 +123,12 @@ func (cfg Config) toTemplateParams() (map[string]interface{}, error) {
 		option.SDSTokenPath(cfg.SDSTokenPath),
 		option.SDSUDSPath(cfg.SDSUDSPath),
 		option.ControlPlaneAuth(cfg.ControlPlaneAuth),
-		option.DisableReportCalls(cfg.DisableReportCalls))
+		option.DisableReportCalls(cfg.DisableReportCalls),
+		option.STSPort(cfg.StsPort))
 
 	// Support passing extra info from node environment as metadata
 	sdsEnabled := cfg.SDSTokenPath != "" && cfg.SDSUDSPath != ""
-	meta, rawMeta, err := getNodeMetaData(cfg.LocalEnv, cfg.PlatEnv, cfg.NodeIPs, sdsEnabled)
+	meta, rawMeta, err := getNodeMetaData(cfg.LocalEnv, cfg.PlatEnv, cfg.NodeIPs, sdsEnabled, cfg.StsPort)
 	if err != nil {
 		return nil, err
 	}
@@ -408,7 +415,7 @@ func extractAttributesMetadata(envVars []string, plat platform.Environment, meta
 // 					The name of variable is ignored.
 // ISTIO_META_* env variables are passed thru
 func getNodeMetaData(envs []string, plat platform.Environment, nodeIPs []string,
-	sdsEnabled bool) (*model.NodeMetadata, map[string]interface{}, error) {
+	sdsEnabled bool, stsPort int) (*model.NodeMetadata, map[string]interface{}, error) {
 	meta := &model.NodeMetadata{}
 	untypedMeta := map[string]interface{}{}
 
@@ -440,6 +447,11 @@ func getNodeMetaData(envs []string, plat platform.Environment, nodeIPs []string,
 		// sds is enabled
 		meta.SdsEnabled = "1"
 		meta.SdsTrustJwt = "1"
+	}
+
+	// Add STS port into node metadata if it is not 0.
+	if stsPort != 0 {
+		meta.StsPort = strconv.Itoa(stsPort)
 	}
 
 	return meta, untypedMeta, nil

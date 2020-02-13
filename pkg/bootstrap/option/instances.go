@@ -231,3 +231,7 @@ func SDSUDSPath(value string) Instance {
 func SDSTokenPath(value string) Instance {
 	return newOption("sds_token_path", value)
 }
+
+func STSPort(value int) Instance {
+	return newOption("sts_port", value)
+}

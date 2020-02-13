@@ -680,6 +680,12 @@ func TestOptions(t *testing.T) {
 			option:   option.SDSTokenPath("fake"),
 			expected: "fake",
 		},
+		{
+			testName: "sts_port",
+			key:      "sts_port",
+			option:   option.STSPort(5555),
+			expected: 5555,
+		},
 	}
 
 	for _, c := range cases {

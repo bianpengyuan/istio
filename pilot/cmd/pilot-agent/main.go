@@ -32,6 +32,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 
+	stsserver "istio.io/istio/security/pkg/stsservice/server"
+	"istio.io/istio/security/pkg/stsservice/tokenmanager"
+
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/pkg/collateral"
@@ -55,7 +58,11 @@ import (
 	"istio.io/istio/pkg/util/gogoprotomarshal"
 )
 
-const trustworthyJWTPath = "/var/run/secrets/tokens/istio-token"
+const (
+	trustworthyJWTPath = "/var/run/secrets/tokens/istio-token"
+	localHostIPv4      = "127.0.0.1"
+	localHostIPv6      = "[::1]"
+)
 
 var (
 	role             = &model.Proxy{}
@@ -66,6 +73,8 @@ var (
 	mixerIdentity    string
 	statusPort       uint16
 	applicationPorts []string
+	stsPort            int
+	tokenManagerPlugin string
 
 	// proxy config flags (named identically)
 	configPath               string
@@ -376,6 +385,7 @@ var (
 						option.DisableReportCalls(disableInternalTelemetry),
 						option.SDSTokenPath(sdsTokenPath),
 						option.SDSUDSPath(sdsUDSPath),
+						option.STSPort(stsPort),
 					}
 
 					// Check if nodeIP carries IPv4 or IPv6 and set up proxy accordingly
@@ -422,9 +432,9 @@ var (
 					cancel()
 					return err
 				}
-				localHostAddr := "127.0.0.1"
+				localHostAddr := localHostIPv4
 				if proxyIPv6 {
-					localHostAddr = "[::1]"
+					localHostAddr = localHostIPv6
 				}
 				prober := kubeAppProberNameVar.Get()
 				statusServer, err := status.NewServer(status.Config{
@@ -440,6 +450,27 @@ var (
 					return err
 				}
 				go waitForCompletion(ctx, statusServer.Run)
+			}
+
+			// If security token service (STS) port is not zero, start STS server and
+			// listen on STS port for STS requests. For STS, see
+			// https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16.
+			if stsPort > 0 {
+				localHostAddr := localHostIPv4
+				if proxyIPv6 {
+					localHostAddr = localHostIPv6
+				}
+				tokenManager := tokenmanager.CreateTokenManager(tokenManagerPlugin,
+					tokenmanager.Config{TrustDomain: trustDomain})
+				stsServer, err := stsserver.NewServer(stsserver.Config{
+					LocalHostAddr: localHostAddr,
+					LocalPort:     stsPort,
+				}, tokenManager)
+				if err != nil {
+					cancel()
+					return err
+				}
+				defer stsServer.Stop()
 			}
 
 			log.Infof("PilotSAN %#v", pilotSAN)
@@ -460,6 +491,7 @@ var (
 				SDSTokenPath:        sdsTokenPath,
 				ControlPlaneAuth:    controlPlaneAuthEnabled,
 				DisableReportCalls:  disableInternalTelemetry,
+				StsPort:             stsPort,
 			})
 
 			agent := envoy.NewAgent(envoyProxy, features.TerminationDrainDuration())
@@ -658,6 +690,11 @@ func init() {
 		"HTTP Port on which to serve pilot agent status. If zero, agent status will not be provided.")
 	proxyCmd.PersistentFlags().StringSliceVar(&applicationPorts, "applicationPorts", []string{},
 		"Ports exposed by the application. Used to determine that Envoy is configured and ready to receive traffic.")
+
+	proxyCmd.PersistentFlags().IntVar(&stsPort, "stsPort", 0,
+		"HTTP Port on which to serve Security Token Service (STS). If zero, STS service will not be provided.")
+	proxyCmd.PersistentFlags().StringVar(&tokenManagerPlugin, "tokenManagerPlugin", tokenmanager.GoogleTokenExchange,
+		"Token provider specific plugin name.")
 
 	// Flags for proxy configuration
 	values := mesh.DefaultProxyConfig()
