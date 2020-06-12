@@ -83,7 +83,7 @@
       "inclusion_list": {
         "patterns": [
           {
-          "prefix": "reporter="
+          "regex": ".*"
           },
           {{- range $a, $s := .inclusionPrefix }}
           {
