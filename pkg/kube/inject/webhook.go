@@ -187,14 +187,6 @@ func NewWebhook(p WebhookParameters) (*Webhook, error) {
 		wh.mu.Unlock()
 	})
 
-	if p.MonitoringPort >= 0 {
-		mon, err := startMonitor(p.Mux, p.MonitoringPort)
-		if err != nil {
-			return nil, fmt.Errorf("could not start monitoring server %v", err)
-		}
-		wh.mon = mon
-	}
-
 	return wh, nil
 }
 
