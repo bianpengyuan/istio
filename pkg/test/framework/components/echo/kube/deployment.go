@@ -98,9 +98,11 @@ spec:
 {{- if $.ServiceAccount }}
       serviceAccountName: {{ $.Service }}
 {{- end }}
+      imagePullSecrets:
+      - name: gcr-access-token
       containers:
       - name: app
-        image: {{ $.Hub }}/app:{{ $.Tag }}
+        image: docker.io/istio/app:1.6.0
         imagePullPolicy: {{ $.PullPolicy }}
         securityContext:
           runAsUser: 1
