@@ -16,6 +16,9 @@ package prometheus
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,6 +108,23 @@ func TestSetup(ctx resource.Context) (err error) {
 	})
 	if err != nil {
 		return
+	}
+
+	fmt.Println("generate secret!")
+	token, err := exec.Command("gcloud", "auth", "--impersonate-service-account=asm-tests@asm-staging-images.iam.gserviceaccount.com", "print-access-token").Output()
+	if err != nil {
+		fmt.Printf("cannot generate token %v", err)
+	}
+
+	cmd := exec.Command("kubectl", "create", "secret", "docker-registry", "gcr-access-token", fmt.Sprintf("-n%s", appNsInst.Name()), "--docker-server=gcr.io",
+		"--docker-username=oauth2accesstoken", fmt.Sprintf("--docker-password=\"%s\"", strings.TrimSuffix(string(token), "\n")),
+		"--docker-email=asm-tests@asm-staging-images.iam.gserviceaccount.com")
+	fmt.Println(cmd.String())
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		fmt.Printf("failed to create secret %s\n", err)
 	}
 	if pilotInst, err = pilot.New(ctx, pilot.Config{
 		Galley: galInst,
