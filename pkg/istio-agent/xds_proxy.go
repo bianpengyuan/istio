@@ -30,7 +30,9 @@ import (
 	"sync"
 	"time"
 
+	listener "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	resource "github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/oauth2"
 	google_rpc "google.golang.org/genproto/googleapis/rpc/status"
@@ -42,6 +44,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 
+	grpcStatus "google.golang.org/genproto/googleapis/rpc/status"
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/cmd/pilot-agent/status/ready"
 	"istio.io/istio/pilot/pkg/dns"
@@ -50,8 +53,10 @@ import (
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/istio-agent/health"
 	"istio.io/istio/pkg/istio-agent/metrics"
+	wasmconvert "istio.io/istio/pkg/istio-agent/wasm"
 	"istio.io/istio/pkg/mcp/status"
 	"istio.io/istio/pkg/uds"
+	"istio.io/istio/pkg/wasm"
 	"istio.io/pkg/log"
 )
 
@@ -82,7 +87,9 @@ type XdsProxy struct {
 	istiodDialOptions    []grpc.DialOption
 	localDNSServer       *dns.LocalDNSServer
 	healthChecker        *health.WorkloadHealthChecker
+	wasmCache            *wasm.Cache
 	xdsHeaders           map[string]string
+	lastLDSAckVersion    string
 
 	// connected stores the active gRPC stream. The proxy will only have 1 connection at a time
 	connected      *ProxyConnection
@@ -113,6 +120,7 @@ func initXdsProxy(ia *Agent) (*XdsProxy, error) {
 		localDNSServer: ia.localDNSServer,
 		stopChan:       make(chan struct{}),
 		healthChecker:  health.NewWorkloadHealthChecker(ia.proxyConfig.ReadinessProbe, envoyProbe),
+		wasmCache:      wasm.NewCache("/etc/istio/proxy"),
 		xdsHeaders:     ia.cfg.XDSHeaders,
 	}
 
@@ -296,7 +304,7 @@ func (p *XdsProxy) HandleUpstream(ctx context.Context, con *ProxyConnection, xds
 		case err := <-con.upstreamError:
 			// error from upstream Istiod.
 			if isExpectedGRPCError(err) {
-				proxyLog.Debugf("upstream terminated with status %v", err)
+				proxyLog.Infof("upstream terminated with status %v", err)
 				metrics.IstiodConnectionCancellations.Increment()
 			} else {
 				proxyLog.Warnf("upstream terminated with unexpected error %v", err)
@@ -306,7 +314,7 @@ func (p *XdsProxy) HandleUpstream(ctx context.Context, con *ProxyConnection, xds
 		case err := <-con.downstreamError:
 			// error from downstream Envoy.
 			if isExpectedGRPCError(err) {
-				proxyLog.Debugf("downstream terminated with status %v", err)
+				proxyLog.Infof("downstream terminated with status %v", err)
 				metrics.EnvoyConnectionCancellations.Increment()
 			} else {
 				proxyLog.Warnf("downstream terminated with unexpected error %v", err)
@@ -325,8 +333,11 @@ func (p *XdsProxy) handleUpstreamRequest(ctx context.Context, con *ProxyConnecti
 	for {
 		select {
 		case req := <-con.requestsChan:
-			proxyLog.Debugf("request for type url %s", req.TypeUrl)
+			proxyLog.Infof("request for type url %s", req.TypeUrl)
 			metrics.XdsProxyRequests.Increment()
+			if req.TypeUrl == resource.ListenerType && req.VersionInfo != "" {
+				p.lastLDSAckVersion = req.VersionInfo
+			}
 			if err := sendUpstreamWithTimeout(ctx, con.upstream, req); err != nil {
 				proxyLog.Errorf("upstream send error for type url %s: %v", req.TypeUrl, err)
 				con.upstreamError <- err
@@ -343,7 +354,7 @@ func (p *XdsProxy) handleUpstreamResponse(con *ProxyConnection) {
 		select {
 		case resp := <-con.responsesChan:
 			// TODO: separate upstream response handling from requests sending, which are both time costly
-			proxyLog.Debugf("response for type url %s", resp.TypeUrl)
+			proxyLog.Infof("response for type url %s", resp.TypeUrl)
 			metrics.XdsProxyResponses.Increment()
 			switch resp.TypeUrl {
 			case v3.NameTableType:
@@ -362,6 +373,52 @@ func (p *XdsProxy) handleUpstreamResponse(con *ProxyConnection) {
 					VersionInfo:   resp.VersionInfo,
 					TypeUrl:       v3.NameTableType,
 					ResponseNonce: resp.Nonce,
+				}
+			case resource.ListenerType:
+				// intercept, replace Wasm remote load with local file path.
+				// TODO: deal with fail open, or not?
+				// TODO: add parallel download
+				proxyLog.Info("intercept listener")
+				sendNack := false
+				for i, r := range resp.Resources {
+					var l listener.Listener
+					if err := ptypes.UnmarshalAny(r, &l); err != nil {
+						log.Errorf("failed to unmarshall listener: %v", err)
+						continue
+					}
+					if found, success := wasmconvert.ConvertWasmFilter(&l, p.wasmCache); !found {
+						log.Debugf("no need to marshal listener again")
+						continue
+					} else if !success {
+						// Send Nack
+						sendNack = true
+						break
+					}
+					nl, err := ptypes.MarshalAny(&l)
+					if err != nil {
+						log.Errorf("failed to marshall new listener: %v", err)
+					}
+					resp.Resources[i] = nl
+				}
+				if sendNack {
+					con.requestsChan <- &discovery.DiscoveryRequest{
+						VersionInfo:   p.lastLDSAckVersion,
+						TypeUrl:       resource.ListenerType,
+						ResponseNonce: resp.Nonce,
+						ErrorDetail: &grpcStatus.Status{
+							Message: "fail to fetch wasm module",
+						},
+					}
+					break
+				}
+				// TODO: Validate the known type urls before forwarding them to Envoy.
+				if err := sendDownstreamWithTimeout(con.downstream, resp); err != nil {
+					proxyLog.Errorf("downstream send error: %v", err)
+					// we cannot return partial error and hope to restart just the downstream
+					// as we are blindly proxying req/responses. For now, the best course of action
+					// is to terminate upstream connection as well and restart afresh.
+					con.downstreamError <- err
+					return
 				}
 			default:
 				// TODO: Validate the known type urls before forwarding them to Envoy.
