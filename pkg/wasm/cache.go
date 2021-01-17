@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -120,14 +121,18 @@ func (c *LocalFileCache) Get(downloadURL, checksum string, timeout time.Duration
 		// If the module is not available locally, download the Wasm module with http fetcher.
 		b, err := c.httpFetcher.Fetch(downloadURL, timeout)
 		if err != nil {
+			wasmRemoteFetchCount.With(resultTag.Value(fetchResultLabelMap[fetchSuccess])).Increment()
 			return "", err
 		}
 
 		// Get sha256 checksum and check if it is the same as provided one.
 		dChecksum := fmt.Sprintf("%x", sha256.Sum256(b))
 		if checksum != "" && dChecksum != checksum {
+			wasmRemoteFetchCount.With(resultTag.Value(fetchResultLabelMap[checksumMismatch])).Increment()
 			return "", fmt.Errorf("module downloaded from %v has checksum %v, which does not match: %v", downloadURL, dChecksum, checksum)
 		}
+
+		wasmRemoteFetchCount.With(resultTag.Value(fetchResultLabelMap[fetchSuccess])).Increment()
 
 		// TODO(bianpengyuan): Add sanity check on downloaded file to make sure it is a valid Wasm module.
 
@@ -170,18 +175,22 @@ func (c *LocalFileCache) addEntry(key cacheKey, wasmModule []byte, f string) err
 		last:       time.Now(),
 	}
 	c.modules[key] = ce
+	wasmCacheEntries.Record(float64(len(c.modules)))
 	return nil
 }
 
 func (c *LocalFileCache) getEntry(key cacheKey) string {
 	modulePath := ""
+	cacheHit := false
 	c.mux.Lock()
 	defer c.mux.Unlock()
 	if ce, ok := c.modules[key]; ok {
 		// Update last touched time.
 		ce.last = time.Now()
 		modulePath = ce.modulePath
+		cacheHit = true
 	}
+	wasmCacheLookupCount.With(hitTag.Value(strconv.FormatBool(cacheHit))).Increment()
 	return modulePath
 }
 
@@ -204,6 +213,7 @@ func (c *LocalFileCache) purge() {
 					}
 				}
 			}
+			wasmCacheEntries.Record(float64(len(c.modules)))
 			c.mux.Unlock()
 		case <-c.stopChan:
 			// Currently this will only happen in test.
