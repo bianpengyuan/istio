@@ -120,7 +120,7 @@ func (c *LocalFileCache) Get(downloadURL, checksum string, timeout time.Duration
 		// If the module is not available locally, download the Wasm module with http fetcher.
 		b, err := c.httpFetcher.Fetch(downloadURL, timeout)
 		if err != nil {
-			wasmRemoteFetchCount.With(resultTag.Value(fetchResultLabelMap[fetchSuccess])).Increment()
+			wasmRemoteFetchCount.With(resultTag.Value(fetchResultLabelMap[downloadFailure])).Increment()
 			return "", err
 		}
 
