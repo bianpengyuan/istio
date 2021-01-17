@@ -39,7 +39,6 @@ const (
 )
 
 // Cache models a Wasm module cache.
-// TODO(bianpengyuan): add metrics to the wasm package.
 type Cache interface {
 	Get(url, checksum string, timeout time.Duration) (string, error)
 	Cleanup()
