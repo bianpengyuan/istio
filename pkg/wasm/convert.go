@@ -40,6 +40,10 @@ func MaybeConvertWasmExtensionConfig(resources []*any.Any, cache Cache) bool {
 	numResources := len(resources)
 	wg.Add(numResources)
 	sendNack := atomic.NewBool(false)
+	startTime := time.Now()
+	defer func() {
+		wasmConfigConversionDuration.Record(float64(time.Now().Sub(startTime).Milliseconds()))
+	}()
 
 	for i := 0; i < numResources; i++ {
 		go func(i int) {

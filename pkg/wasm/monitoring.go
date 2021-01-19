@@ -74,6 +74,12 @@ var (
 		"number of Wasm config conversion count and results, including success, no remote load, marshal failure, remote fetch failure, miss remote fetch hint.",
 		monitoring.WithLabels(resultTag),
 	)
+
+	wasmConfigConversionDuration = monitoring.NewDistribution(
+		"wasm_config_conversion_duration",
+		"Total time in milliseconds istio-agent spends on converting remote load in Wasm config.",
+		[]float64{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384},
+	)
 )
 
 func init() {
@@ -82,5 +88,6 @@ func init() {
 		wasmCacheLookupCount,
 		wasmRemoteFetchCount,
 		wasmConfigConversionCount,
+		wasmConfigConversionDuration,
 	)
 }
