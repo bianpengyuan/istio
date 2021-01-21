@@ -15,8 +15,10 @@
 package wasm
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -25,6 +27,10 @@ import (
 	"time"
 
 	"istio.io/pkg/log"
+
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/gcsblob"
+	_ "gocloud.dev/blob/s3blob"
 )
 
 var wasmLog = log.RegisterScope("wasm", "", 0)
@@ -139,6 +145,17 @@ func (c *LocalFileCache) Get(downloadURL, checksum string, timeout time.Duration
 		}
 
 		return f, nil
+	case "gs", "s3":
+		bucket, _ := blob.OpenBucket(context.TODO(), downloadURL)
+		// Open the key "foo.txt" for reading with the default options.
+		r, _ := bucket.NewReader(context.TODO(), "foo.txt", nil)
+		defer r.Close()
+		// Readers also have a limited view of the blob's metadata.
+		fmt.Println("Content-Type:", r.ContentType())
+		// Copy from the reader to stdout.
+		_, _ = io.Copy(os.Stdout, r)
+
+		return "", nil
 	default:
 		return "", fmt.Errorf("unsupported Wasm module downloading URL scheme: %v", url.Scheme)
 	}
