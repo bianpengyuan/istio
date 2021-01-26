@@ -1,32 +1,3 @@
----
-# Source: istiod-remote/templates/configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: istio
-  namespace: istio-system
-  labels:
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Pilot"
-    release: istiod-remote
-data:
-
-  # Configuration file for the mesh networks to be used by the Split Horizon EDS.
-  meshNetworks: |-
-    networks: {}
-
-  mesh: |-
-    defaultConfig:
-      discoveryAddress: istiod.istio-system.svc:15012
-      tracing:
-        zipkin:
-          address: zipkin.istio-system:9411
-    enablePrometheusMerge: true
-    rootNamespace: istio-system
-    trustDomain: cluster.local
----
-# Source: istiod-remote/templates/istiod-injector-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -36,13 +7,21 @@ metadata:
     istio.io/rev: default
     install.operator.istio.io/owning-resource: unknown
     operator.istio.io/component: "Pilot"
-    release: istiod-remote
+    release: istio
 data:
 
   values: |-
     {
       "global": {
+        "arch": {
+          "amd64": 2,
+          "ppc64le": 2,
+          "s390x": 2
+        },
         "caAddress": "",
+        "centralIstiod": false,
+        "configValidation": true,
+        "defaultNodeSelector": {},
         "defaultPodDisruptionBudget": {
           "enabled": true
         },
@@ -51,7 +30,8 @@ data:
             "cpu": "10m"
           }
         },
-        "externalIstiod": true,
+        "enabled": true,
+        "externalIstiod": false,
         "hub": "gcr.io/istio-testing",
         "imagePullPolicy": "",
         "imagePullSecrets": [],
@@ -71,6 +51,7 @@ data:
           "clusterName": "",
           "enabled": false
         },
+        "namespace": "istio-system",
         "network": "",
         "omitSidecarInjectorConfigMap": false,
         "oneNamespace": false,
@@ -150,10 +131,16 @@ data:
         "trustDomain": "",
         "useMCP": false
       },
+      "istio_cni": {
+        "enabled": false
+      },
       "revision": "",
       "sidecarInjectorWebhook": {
         "alwaysInjectSelector": [],
-        "defaultTemplates": [],
+        "defaultTemplates": [
+          "sidecar",
+          "credential-volume"
+        ],
         "enableNamespacesByDefault": false,
         "injectedAnnotations": {},
         "neverInjectSelector": [],
@@ -162,8 +149,9 @@ data:
           "enabled": true
         },
         "rewriteAppHTTPProbe": true,
-        "templates": {},
-        "useLegacySelectors": true
+        "templates": {
+          "credential-volume": "spec:\n  volumes:\n  - name: application-credentials\n    secret:\n      secretName: secret\n  containers:\n  - name: istio-proxy\n    volumeMounts:\n    - name: application-credentials\n      mountPath: /etc/istio/application-credentials\n      readOnly: true\n"
+        }
       }
     }
 
@@ -174,6 +162,7 @@ data:
   # to fine tune it or use it with kube-inject.
   config: |-
     # defaultTemplates defines the default template to use for pods that do not explicitly specify a template
+    # NOTE: this currently only allows a single element
     defaultTemplates: [sidecar]
     policy: enabled
     alwaysInjectSelector:
@@ -181,7 +170,6 @@ data:
     neverInjectSelector:
       []
     injectedAnnotations:
-    template: "{{ Template_Version_And_Istio_Version_Mismatched_Check_Installation }}"
     templates:
       sidecar: |
         {{- $containers := list }}
@@ -223,8 +211,8 @@ data:
           {{ else -}}
           - name: istio-init
           {{ end -}}
-          {{- if contains "/" (annotation .ObjectMeta `sidecar.istio.io/proxyImage` .Values.global.proxy_init.image) }}
-            image: "{{ annotation .ObjectMeta `sidecar.istio.io/proxyImage` .Values.global.proxy_init.image }}"
+          {{- if contains "/" .Values.global.proxy_init.image }}
+            image: "{{ .Values.global.proxy_init.image }}"
           {{- else }}
             image: "{{ .Values.global.hub }}/{{ .Values.global.proxy_init.image }}:{{ .Values.global.tag }}"
           {{- end }}
@@ -330,8 +318,8 @@ data:
             - sysctl -w kernel.core_pattern=/var/lib/istio/data/core.proxy && ulimit -c unlimited
             command:
               - /bin/sh
-          {{- if contains "/" (annotation .ObjectMeta `sidecar.istio.io/proxyImage` .Values.global.proxy_init.image) }}
-            image: "{{ annotation .ObjectMeta `sidecar.istio.io/proxyImage` .Values.global.proxy_init.image }}"
+          {{- if contains "/" .Values.global.proxy_init.image }}
+            image: "{{ .Values.global.proxy_init.image }}"
           {{- else }}
             image: "{{ .Values.global.hub }}/{{ .Values.global.proxy_init.image }}:{{ .Values.global.tag }}"
           {{- end }}
@@ -372,9 +360,8 @@ data:
             {{ else -}}
             - "{{ valueOrDefault .DeploymentMeta.Name `istio-proxy` }}.{{ valueOrDefault .DeploymentMeta.Namespace `default` }}"
             {{ end -}}
-            - --proxyLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/logLevel` .Values.global.proxy.logLevel }}
-            - --proxyComponentLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/componentLogLevel` .Values.global.proxy.componentLogLevel }}
-            - --log_output_level={{ annotation .ObjectMeta `sidecar.istio.io/agentLogLevel` .Values.global.logging.level }}
+            - --proxyLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/logLevel` .Values.global.proxy.logLevel}}
+            - --proxyComponentLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/componentLogLevel` .Values.global.proxy.componentLogLevel}}
           {{- if .Values.global.sts.servicePort }}
             - --stsPort={{ .Values.global.sts.servicePort }}
           {{- end }}
@@ -675,40 +662,16 @@ data:
           securityContext:
             fsGroup: 1337
           {{- end }}
+      credential-volume: |
+        spec:
+          volumes:
+          - name: application-credentials
+            secret:
+              secretName: secret
+          containers:
+          - name: istio-proxy
+            volumeMounts:
+            - name: application-credentials
+              mountPath: /etc/istio/application-credentials
+              readOnly: true
 ---
-# Source: istiod-remote/templates/mutatingwebhook.yaml
-apiVersion: admissionregistration.k8s.io/v1beta1
-kind: MutatingWebhookConfiguration
-metadata:
-  name: istio-sidecar-injector
-  labels:
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Pilot"
-    app: sidecar-injector
-    release: istiod-remote
-webhooks:
-- name: sidecar-injector.istio.io
-  clientConfig:
-    service:
-      name: istiod
-      namespace: istio-system
-      path: "/inject"
-    caBundle: ""
-  sideEffects: None
-  rules:
-  - operations: [ "CREATE" ]
-    apiGroups: [""]
-    apiVersions: ["v1"]
-    resources: ["pods"]
-  failurePolicy: Fail
-  admissionReviewVersions: ["v1beta1", "v1"]
-  namespaceSelector:
-    matchLabels:
-      istio-injection: enabled
-  objectSelector:
-    matchExpressions:
-    - key: "sidecar.istio.io/inject"
-      operator: NotIn
-      values:
-      - "false"
