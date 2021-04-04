@@ -16,16 +16,29 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
+	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
+	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/cni/pkg/install-cni/pkg/config"
 	"istio.io/istio/cni/pkg/install-cni/pkg/constants"
 	"istio.io/istio/cni/pkg/install-cni/pkg/install"
+	v3 "istio.io/istio/pilot/pkg/xds/v3"
+	"istio.io/istio/pkg/security"
+	"istio.io/istio/security/pkg/nodeagent/caclient"
 	"istio.io/pkg/log"
 )
 
@@ -39,6 +52,62 @@ var rootCmd = &cobra.Command{
 		if cfg, err = constructConfig(); err != nil {
 			return
 		}
+		rootCert, err := ioutil.ReadFile("/var/run/secrets/istio/root-cert.pem")
+		if err != nil {
+			panic(err)
+		}
+
+		certPool := x509.NewCertPool()
+		ok := certPool.AppendCertsFromPEM(rootCert)
+		if !ok {
+			panic(err)
+		}
+		// Start a gRPC stream to get proxy config
+		config := tls.Config{
+			RootCAs: certPool,
+		}
+		opts := []grpc.DialOption{
+			grpc.WithTransportCredentials(credentials.NewTLS(&config)),
+			grpc.WithPerRPCCredentials(caclient.NewXDSTokenProvider(&security.Options{
+				JWTPath: "/var/run/secrets/tokens/istio-token",
+			})),
+		}
+		upstreamConn, err := grpc.DialContext(ctx, "istiod.istio-system.svc:15012", opts...)
+		if err != nil {
+			fmt.Printf("bianpengyuan: failed to connect %+v\n!", err)
+		} else {
+			fmt.Println("bianpengyuan: connected!")
+		}
+
+		xds := discovery.NewAggregatedDiscoveryServiceClient(upstreamConn)
+		stream, err := xds.StreamAggregatedResources(context.Background())
+		if err != nil {
+			panic(err.Error())
+		}
+		err = stream.Send(&discovery.DiscoveryRequest{
+			Node: &core.Node{
+				Id: "sidecar~0.0.0.0~istio-cni.kube-system~kube-system.svc.cluster.local",
+			},
+			TypeUrl: v3.ProxyConfigType,
+		})
+		if err != nil {
+			panic("bianpengyuan: " + err.Error())
+		}
+		go func() {
+			for {
+				res, err := stream.Recv()
+				if err != nil {
+					panic("bianpengyuan: " + err.Error())
+				}
+				var pc = &meshconfig.ProxyConfig{}
+				// nolint: staticcheck
+				if err := ptypes.UnmarshalAny(res.Resources[0], pc); err != nil {
+					log.Errorf("failed to unmarshall name table: %v", err)
+					panic("bianpengyuan: " + err.Error())
+				}
+				fmt.Printf("proxy config is %+v\n", pc)
+			}
+		}()
 
 		isReady := install.StartServer()
 

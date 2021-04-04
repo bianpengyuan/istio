@@ -16,6 +16,7 @@ package xds
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -90,11 +91,13 @@ func (s *DiscoveryServer) findGenerator(typeURL string, con *Connection) model.X
 // choose to send partial or even no response if there are no changes.
 func (s *DiscoveryServer) pushXds(con *Connection, push *model.PushContext,
 	currentVersion string, w *model.WatchedResource, req *model.PushRequest) error {
+	fmt.Printf("bianpengyuan: push xds %v %v\n", con.proxy.ID, w.TypeUrl)
 	if w == nil {
 		return nil
 	}
 	gen := s.findGenerator(w.TypeUrl, con)
 	if gen == nil {
+		fmt.Println("gen is nil!!")
 		return nil
 	}
 
@@ -106,6 +109,7 @@ func (s *DiscoveryServer) pushXds(con *Connection, push *model.PushContext,
 		if s.StatusReporter != nil {
 			s.StatusReporter.RegisterEvent(con.ConID, w.TypeUrl, push.LedgerVersion)
 		}
+		fmt.Printf("generate error %v %v!!\n", err, res)
 		return err
 	}
 	defer func() { recordPushTime(w.TypeUrl, time.Since(t0)) }()
@@ -117,6 +121,7 @@ func (s *DiscoveryServer) pushXds(con *Connection, push *model.PushContext,
 		Nonce:        nonce(push.LedgerVersion),
 		Resources:    res,
 	}
+	fmt.Printf("bianpengyuan resource is %v\n", res)
 
 	if err := con.send(resp); err != nil {
 		recordSendError(w.TypeUrl, con.ConID, err)

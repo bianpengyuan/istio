@@ -332,6 +332,7 @@ func (s *DiscoveryServer) Stream(stream DiscoveryStream) error {
 			// Adding sync is the second issue to be resolved if we want to save 1/2 of the threads.
 			err := s.processRequest(req, con)
 			if err != nil {
+				fmt.Printf("bianpengyuan process request error %v", err)
 				return err
 			}
 

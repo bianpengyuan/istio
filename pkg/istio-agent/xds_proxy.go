@@ -606,6 +606,7 @@ func (p *XdsProxy) buildUpstreamClientDialOpts(sa *Agent) ([]grpc.DialOption, er
 	}
 
 	if !sa.secOpts.FileMountedCerts {
+		fmt.Printf("bianpengyuan: sec opts %+v\n", sa.secOpts)
 		dialOptions = append(dialOptions, grpc.WithPerRPCCredentials(caclient.NewXDSTokenProvider(sa.secOpts)))
 	}
 	return dialOptions, nil

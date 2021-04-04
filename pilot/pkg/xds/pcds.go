@@ -15,8 +15,8 @@
 package xds
 
 import (
-	mesh "istio.io/api/mesh/v1alpha1"
-	"istio.io/istio/pilot/pkg/features"
+	"fmt"
+
 	"istio.io/istio/pilot/pkg/model"
 	tb "istio.io/istio/pilot/pkg/trustbundle"
 	"istio.io/istio/pkg/util/gogo"
@@ -31,9 +31,9 @@ type PcdsGenerator struct {
 var _ model.XdsResourceGenerator = &PcdsGenerator{}
 
 func pcdsNeedsPush(req *model.PushRequest) bool {
-	if !features.MultiRootMesh.Get() {
-		return false
-	}
+	// if !features.MultiRootMesh.Get() {
+	// 	return false
+	// }
 
 	if req == nil {
 		return true
@@ -54,14 +54,16 @@ func pcdsNeedsPush(req *model.PushRequest) bool {
 // Generate returns ProxyConfig protobuf containing TrustBundle for given proxy
 func (e *PcdsGenerator) Generate(proxy *model.Proxy, push *model.PushContext, w *model.WatchedResource, req *model.PushRequest) (model.Resources, error) {
 	if !pcdsNeedsPush(req) {
+		fmt.Println("no need to push!")
 		return nil, nil
 	}
-	if e.TrustBundle == nil {
-		return nil, nil
-	}
+	// if e.TrustBundle == nil {
+	// 	return nil, nil
+	// }
 	// TODO: For now, only TrustBundle updates are pushed. Eventually, this should push entire Proxy Configuration
-	pc := &mesh.ProxyConfig{
-		CaCertificatesPem: e.TrustBundle.GetTrustBundle(),
-	}
-	return model.Resources{gogo.MessageToAny(pc)}, nil
+	// pc := &mesh.ProxyConfig{
+	// 	CaCertificatesPem: e.TrustBundle.GetTrustBundle(),
+	// }
+	fmt.Printf("bianpengyuan default config %v\n", push.Mesh.GetDefaultConfig())
+	return model.Resources{gogo.MessageToAny(push.Mesh.GetDefaultConfig())}, nil
 }
