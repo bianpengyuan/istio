@@ -177,7 +177,7 @@ func sleepCheckInstall(ctx context.Context, cfg *config.Config, cniConfigFilepat
 		// Check if file has been modified or if an error has occurred during checkInstall before setting isReady to true
 		select {
 		case <-fileModified:
-			return nil
+			continue
 		case err := <-errChan:
 			return err
 		case <-ctx.Done():

@@ -134,13 +134,10 @@ func writeCNIConfig(ctx context.Context, cniConfig []byte, cfg pluginConfig) (st
 	}
 
 	if cfg.chainedCNIPlugin {
-		if !file.Exists(cniConfigFilepath) {
-			return "", fmt.Errorf("CNI config file %s removed during configuration", cniConfigFilepath)
-		}
 		// This section overwrites an existing plugins list entry for istio-cni
 		existingCNIConfig, err := ioutil.ReadFile(cniConfigFilepath)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("cannot read CNI config file %s: %v", cniConfigFilepath, err)
 		}
 		cniConfig, err = insertCNIConfig(cniConfig, existingCNIConfig)
 		if err != nil {
@@ -186,11 +183,13 @@ func getCNIConfigFilepath(ctx context.Context, cfg pluginConfig) (string, error)
 		_ = watcher.Close()
 	}()
 
+	// CNIConfName is not set, try to detect it from mounted host CNI net directory.
 	for len(filename) == 0 {
 		filename, err = getDefaultCNINetwork(cfg.mountedCNINetDir)
 		if err == nil {
 			break
 		}
+		log.Infof("cannot find valid CNI config file: %v, wait indefinitely for CNI config file to be updated...", err)
 		if err = util.WaitForFileMod(ctx, fileModified, errChan); err != nil {
 			return "", err
 		}
@@ -199,6 +198,9 @@ func getCNIConfigFilepath(ctx context.Context, cfg pluginConfig) (string, error)
 	cniConfigFilepath := filepath.Join(cfg.mountedCNINetDir, filename)
 
 	for !file.Exists(cniConfigFilepath) {
+		// The provided CNI config file might not exist. This can be due to unexpectd file extension (.conf vs .conflist) being used.
+		// The following tries to adapt unexpected file extension first, if still canont find the CNI config file,
+		// wait indefinitely for the file update.
 		if strings.HasSuffix(cniConfigFilepath, ".conf") && file.Exists(cniConfigFilepath+"list") {
 			log.Infof("%s doesn't exist, but %[1]slist does; Using it as the CNI config file instead.", cniConfigFilepath)
 			cniConfigFilepath += "list"
@@ -281,6 +283,7 @@ func insertCNIConfig(newCNIConfig, existingCNIConfig []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error loading existing CNI config (JSON error): %v", err)
 	}
+	log.Infof("existing CNI config %+v", string(existingCNIConfig))
 
 	delete(istioMap, "cniVersion")
 
@@ -321,5 +324,9 @@ func insertCNIConfig(newCNIConfig, existingCNIConfig []byte) ([]byte, error) {
 		newMap["plugins"] = append(plugins, istioMap)
 	}
 
-	return util.MarshalCNIConfig(newMap)
+	ret, err := util.MarshalCNIConfig(newMap)
+	if err == nil {
+		log.Infof("new CNI config %+v", string(ret))
+	}
+	return ret, err
 }
