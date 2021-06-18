@@ -283,7 +283,7 @@ func cmdDel(args *skel.CmdArgs) error {
 func main() {
 	loggingOptions.OutputPaths = []string{"stderr"}
 	loggingOptions.JSONEncoding = true
-	if err := log.Configure(loggingOptions); err != nil {
+	if err := log.Configure(loggingOptions.WithTeeToUDS("/var/run/istio-cni/cni-1.sock", "/log")); err != nil {
 		os.Exit(1)
 	}
 	// TODO: implement plugin version

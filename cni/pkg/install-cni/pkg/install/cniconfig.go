@@ -48,6 +48,7 @@ type cniConfigVars struct {
 	cniNetDir          string
 	kubeconfigFilename string
 	logLevel           string
+	logFile            string
 	k8sServiceHost     string
 	k8sServicePort     string
 	k8sNodeName        string
@@ -73,6 +74,7 @@ func getCNIConfigVars(cfg *config.Config) cniConfigVars {
 		cniNetDir:          cfg.CNINetDir,
 		kubeconfigFilename: cfg.KubeconfigFilename,
 		logLevel:           cfg.LogLevel,
+		logFile:            cfg.LogFile,
 		k8sServiceHost:     cfg.K8sServiceHost,
 		k8sServicePort:     cfg.K8sServicePort,
 		k8sNodeName:        cfg.K8sNodeName,
@@ -112,6 +114,7 @@ func replaceCNIConfigVars(cniConfig []byte, vars cniConfigVars, saToken string) 
 	cniConfigStr := string(cniConfig)
 
 	cniConfigStr = strings.ReplaceAll(cniConfigStr, "__LOG_LEVEL__", vars.logLevel)
+	cniConfigStr = strings.ReplaceAll(cniConfigStr, "__LOG_FILE__", vars.logFile)
 	cniConfigStr = strings.ReplaceAll(cniConfigStr, "__KUBECONFIG_FILENAME__", vars.kubeconfigFilename)
 	cniConfigStr = strings.ReplaceAll(cniConfigStr, "__KUBECONFIG_FILEPATH__", filepath.Join(vars.cniNetDir, vars.kubeconfigFilename))
 	cniConfigStr = strings.ReplaceAll(cniConfigStr, "__KUBERNETES_SERVICE_HOST__", vars.k8sServiceHost)

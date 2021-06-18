@@ -26,6 +26,7 @@ import (
 	"istio.io/istio/cni/pkg/install-cni/pkg/config"
 	"istio.io/istio/cni/pkg/install-cni/pkg/constants"
 	"istio.io/istio/cni/pkg/install-cni/pkg/install"
+	udsLog "istio.io/istio/cni/pkg/install-cni/pkg/log"
 	"istio.io/pkg/log"
 )
 
@@ -42,6 +43,10 @@ var rootCmd = &cobra.Command{
 		log.Infof("install cni with configuration: \n%+v", cfg)
 
 		isReady := install.StartServer()
+
+		if err = udsLog.StartUDSLogServer(cfg.LogFile); err != nil {
+			return
+		}
 
 		installer := install.NewInstaller(cfg, isReady)
 
@@ -141,6 +146,7 @@ func constructConfig() (*config.Config, error) {
 		CNIBinTargetDirs:  []string{constants.HostCNIBinDir, constants.SecondaryBinDir},
 		UpdateCNIBinaries: viper.GetBool(constants.UpdateCNIBinaries),
 		SkipCNIBinaries:   viper.GetStringSlice(constants.SkipCNIBinaries),
+		LogFile:           viper.GetString(constants.LogFile),
 	}
 
 	if len(cfg.K8sNodeName) == 0 {

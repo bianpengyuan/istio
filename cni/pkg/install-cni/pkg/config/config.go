@@ -64,6 +64,9 @@ type Config struct {
 
 	// The names of binaries to skip when copying
 	SkipCNIBinaries []string
+
+	// LogFile
+	LogFile string
 }
 
 func (c *Config) String() string {
@@ -87,5 +90,6 @@ func (c *Config) String() string {
 	b.WriteString("K8sNodeName: " + c.K8sNodeName + "\n")
 	b.WriteString("UpdateCNIBinaries: " + fmt.Sprint(c.UpdateCNIBinaries) + "\n")
 	b.WriteString("SkipCNIBinaries: " + fmt.Sprint(c.SkipCNIBinaries) + "\n")
+	b.WriteString("LogFile: " + fmt.Sprint(c.LogFile) + "\n")
 	return b.String()
 }
