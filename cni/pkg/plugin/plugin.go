@@ -265,10 +265,12 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 
 	var result *current.Result
 	if conf.PrevResult == nil {
+
 		result = &current.Result{
 			CNIVersion: current.ImplementedSpecVersion,
 		}
 	} else {
+
 		// Pass through the result for the next plugin
 		result = conf.PrevResult
 	}

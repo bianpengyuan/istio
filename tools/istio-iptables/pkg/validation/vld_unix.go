@@ -22,6 +22,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/prometheus/common/log"
 	"golang.org/x/sys/unix"
 
 	"istio.io/istio/tools/istio-iptables/pkg/constants"
@@ -66,7 +67,7 @@ func GetOriginalDestination(conn net.Conn) (daddr net.IP, dport uint16, err erro
 				unix.IPPROTO_IP,
 				constants.SoOriginalDst)
 		if err != nil {
-			fmt.Println("error ipv4 getsockopt")
+			log.Info("error ipv4 getsockopt")
 			return
 		}
 		// See struct sockaddr_in
@@ -78,7 +79,7 @@ func GetOriginalDestination(conn net.Conn) (daddr net.IP, dport uint16, err erro
 			constants.SoOriginalDst)
 
 		if err != nil {
-			fmt.Println("error ipv6 getsockopt")
+			log.Info("error ipv6 getsockopt")
 			return
 		}
 		// See struct sockaddr_in6
@@ -87,8 +88,8 @@ func GetOriginalDestination(conn net.Conn) (daddr net.IP, dport uint16, err erro
 	// See sockaddr_in6 and sockaddr_in
 	dport = ntohs(addr.Addr.Port)
 
-	fmt.Printf("local addr %s\n", conn.LocalAddr())
-	fmt.Printf("original addr %s:%d\n", ip, dport)
+	log.Infof("local addr %s\n", conn.LocalAddr())
+	log.Infof("original addr %s:%d\n", ip, dport)
 	return
 }
 
@@ -97,11 +98,11 @@ func reuseAddr(network, address string, conn syscall.RawConn) error {
 	return conn.Control(func(descriptor uintptr) {
 		err := unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
 		if err != nil {
-			fmt.Printf("fail to set fd %d SO_REUSEADDR with error %v\n", descriptor, err)
+			log.Infof("fail to set fd %d SO_REUSEADDR with error %v\n", descriptor, err)
 		}
 		err = unix.SetsockoptInt(int(descriptor), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 		if err != nil {
-			fmt.Printf("fail to set fd %d SO_REUSEPORT with error %v\n", descriptor, err)
+			log.Infof("fail to set fd %d SO_REUSEPORT with error %v\n", descriptor, err)
 		}
 	})
 }

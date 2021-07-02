@@ -26,6 +26,7 @@ import (
 	"istio.io/istio/tools/istio-iptables/pkg/config"
 	"istio.io/istio/tools/istio-iptables/pkg/constants"
 	dep "istio.io/istio/tools/istio-iptables/pkg/dependencies"
+	"istio.io/pkg/log"
 )
 
 type Ops int
@@ -117,20 +118,20 @@ func (iptConfigurator *IptablesConfigurator) separateV4V6(cidrList string) (Netw
 
 func (iptConfigurator *IptablesConfigurator) logConfig() {
 	// Dump out our environment for debugging purposes.
-	fmt.Println("Environment:")
-	fmt.Println("------------")
-	fmt.Printf("ENVOY_PORT=%s\n", os.Getenv("ENVOY_PORT"))
-	fmt.Printf("INBOUND_CAPTURE_PORT=%s\n", os.Getenv("INBOUND_CAPTURE_PORT"))
-	fmt.Printf("ISTIO_INBOUND_INTERCEPTION_MODE=%s\n", os.Getenv("ISTIO_INBOUND_INTERCEPTION_MODE"))
-	fmt.Printf("ISTIO_INBOUND_TPROXY_MARK=%s\n", os.Getenv("ISTIO_INBOUND_TPROXY_MARK"))
-	fmt.Printf("ISTIO_INBOUND_TPROXY_ROUTE_TABLE=%s\n", os.Getenv("ISTIO_INBOUND_TPROXY_ROUTE_TABLE"))
-	fmt.Printf("ISTIO_INBOUND_PORTS=%s\n", os.Getenv("ISTIO_INBOUND_PORTS"))
-	fmt.Printf("ISTIO_OUTBOUND_PORTS=%s\n", os.Getenv("ISTIO_OUTBOUND_PORTS"))
-	fmt.Printf("ISTIO_LOCAL_EXCLUDE_PORTS=%s\n", os.Getenv("ISTIO_LOCAL_EXCLUDE_PORTS"))
-	fmt.Printf("ISTIO_SERVICE_CIDR=%s\n", os.Getenv("ISTIO_SERVICE_CIDR"))
-	fmt.Printf("ISTIO_SERVICE_EXCLUDE_CIDR=%s\n", os.Getenv("ISTIO_SERVICE_EXCLUDE_CIDR"))
-	fmt.Printf("ISTIO_META_DNS_CAPTURE=%s\n", os.Getenv("ISTIO_META_DNS_CAPTURE"))
-	fmt.Println("")
+	log.Info("Environment:")
+	log.Info("------------")
+	log.Infof("ENVOY_PORT=%s\n", os.Getenv("ENVOY_PORT"))
+	log.Infof("INBOUND_CAPTURE_PORT=%s\n", os.Getenv("INBOUND_CAPTURE_PORT"))
+	log.Infof("ISTIO_INBOUND_INTERCEPTION_MODE=%s\n", os.Getenv("ISTIO_INBOUND_INTERCEPTION_MODE"))
+	log.Infof("ISTIO_INBOUND_TPROXY_MARK=%s\n", os.Getenv("ISTIO_INBOUND_TPROXY_MARK"))
+	log.Infof("ISTIO_INBOUND_TPROXY_ROUTE_TABLE=%s\n", os.Getenv("ISTIO_INBOUND_TPROXY_ROUTE_TABLE"))
+	log.Infof("ISTIO_INBOUND_PORTS=%s\n", os.Getenv("ISTIO_INBOUND_PORTS"))
+	log.Infof("ISTIO_OUTBOUND_PORTS=%s\n", os.Getenv("ISTIO_OUTBOUND_PORTS"))
+	log.Infof("ISTIO_LOCAL_EXCLUDE_PORTS=%s\n", os.Getenv("ISTIO_LOCAL_EXCLUDE_PORTS"))
+	log.Infof("ISTIO_SERVICE_CIDR=%s\n", os.Getenv("ISTIO_SERVICE_CIDR"))
+	log.Infof("ISTIO_SERVICE_EXCLUDE_CIDR=%s\n", os.Getenv("ISTIO_SERVICE_EXCLUDE_CIDR"))
+	log.Infof("ISTIO_META_DNS_CAPTURE=%s\n", os.Getenv("ISTIO_META_DNS_CAPTURE"))
+	log.Info("")
 	iptConfigurator.cfg.Print()
 }
 
@@ -599,6 +600,7 @@ func (iptConfigurator *IptablesConfigurator) run() {
 		iptConfigurator.iptables.InsertRuleV4(constants.ISTIOINBOUND, constants.MANGLE, 3,
 			"-p", constants.TCP, "-i", "lo", "-m", "mark", "!", "--mark", outboundMark, "-j", constants.RETURN)
 	}
+
 	iptConfigurator.executeCommands()
 }
 
@@ -814,8 +816,8 @@ func (iptConfigurator *IptablesConfigurator) handleOutboundPortsInclude() {
 
 func (iptConfigurator *IptablesConfigurator) createRulesFile(f *os.File, contents string) error {
 	defer f.Close()
-	fmt.Println("Writing following contents to rules file: ", f.Name())
-	fmt.Println(contents)
+	log.Info("Writing following contents to rules file: ", f.Name())
+	log.Info(contents)
 	writer := bufio.NewWriter(f)
 	_, err := writer.WriteString(contents)
 	if err != nil {
@@ -837,6 +839,7 @@ func (iptConfigurator *IptablesConfigurator) executeIptablesCommands(commands []
 
 func (iptConfigurator *IptablesConfigurator) executeIptablesRestoreCommand(isIpv4 bool) error {
 	var data, filename, cmd string
+	args := make([]string, 0)
 	if isIpv4 {
 		data = iptConfigurator.iptables.BuildV4Restore()
 		filename = fmt.Sprintf("iptables-rules-%d.txt", time.Now().UnixNano())
@@ -846,16 +849,33 @@ func (iptConfigurator *IptablesConfigurator) executeIptablesRestoreCommand(isIpv
 		filename = fmt.Sprintf("ip6tables-rules-%d.txt", time.Now().UnixNano())
 		cmd = constants.IP6TABLESRESTORE
 	}
-	rulesFile, err := ioutil.TempFile("", filename)
-	if err != nil {
-		return fmt.Errorf("unable to create iptables-restore file: %v", err)
+	if iptConfigurator.cfg.NetworkNamespace != "" {
+		iptableCmd := cmd
+		cmd = constants.NSENTER
+		args = append(args, fmt.Sprintf("--net=%v", iptConfigurator.cfg.NetworkNamespace), "--", iptableCmd)
 	}
-	defer os.Remove(rulesFile.Name())
+	var rulesFile *os.File
+	var err error
+	if iptConfigurator.cfg.OutputPath != "" {
+		// Print the iptables rules into the given output file.
+		rulesFile, err = os.OpenFile(iptConfigurator.cfg.OutputPath, os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			return fmt.Errorf("unable to open iptables rules output file %v: %v", iptConfigurator.cfg.OutputPath, err)
+		}
+	} else {
+		// Otherwise create a temporary file to write iptables rules to, which will be cleaned up at the end.
+		rulesFile, err = ioutil.TempFile("", filename)
+		if err != nil {
+			return fmt.Errorf("unable to create iptables-restore file: %v", err)
+		}
+		defer os.Remove(rulesFile.Name())
+	}
 	if err := iptConfigurator.createRulesFile(rulesFile, data); err != nil {
 		return err
 	}
+	args = append(args, "--noflush", rulesFile.Name())
 	// --noflush to prevent flushing/deleting previous contents from table
-	iptConfigurator.ext.RunOrFail(cmd, "--noflush", rulesFile.Name())
+	iptConfigurator.ext.RunOrFail(cmd, args...)
 	return nil
 }
 
@@ -864,13 +884,16 @@ func (iptConfigurator *IptablesConfigurator) executeCommands() {
 		// Execute iptables-restore
 		err := iptConfigurator.executeIptablesRestoreCommand(true)
 		if err != nil {
-			fmt.Println(err)
+
+			log.Info(err)
 			os.Exit(1)
+		} else {
+
 		}
 		// Execute ip6tables-restore
 		err = iptConfigurator.executeIptablesRestoreCommand(false)
 		if err != nil {
-			fmt.Println(err)
+			log.Info(err)
 			os.Exit(1)
 		}
 	} else {

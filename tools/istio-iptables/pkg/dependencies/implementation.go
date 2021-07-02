@@ -20,9 +20,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"istio.io/istio/pilot/pkg/util/sets"
 	"istio.io/istio/tools/istio-iptables/pkg/constants"
+	"istio.io/pkg/log"
 )
 
 // XTablesExittype is the exit type of xtables commands.
@@ -60,12 +62,24 @@ var XTablesCmds = sets.NewSet(
 )
 
 // RealDependencies implementation of interface Dependencies, which is used in production
-type RealDependencies struct{}
+type RealDependencies struct {
+	NetworkNamespace string
+	CNIMode          bool
+}
 
 func (r *RealDependencies) execute(cmd string, redirectStdout bool, args ...string) error {
-	fmt.Printf("%s %s\n", cmd, strings.Join(args, " "))
+	log.Infof("%s %s\n", cmd, strings.Join(args, " "))
+	if r.CNIMode {
+		originalCmd := cmd
+		cmd = constants.NSENTER
+		args = append([]string{fmt.Sprintf("--net=%v", r.NetworkNamespace), "--", originalCmd}, args...)
+	}
 	externalCommand := exec.Command(cmd, args...)
-	externalCommand.Stdout = os.Stdout
+	if r.CNIMode {
+		externalCommand.Stdout = os.Stderr
+	} else {
+		externalCommand.Stdout = os.Stdout
+	}
 	// TODO Check naming and redirection logic
 	if !redirectStdout {
 		externalCommand.Stderr = os.Stderr
@@ -73,18 +87,38 @@ func (r *RealDependencies) execute(cmd string, redirectStdout bool, args ...stri
 	return externalCommand.Run()
 }
 
-func (r *RealDependencies) executeXTables(cmd string, redirectStdout bool, args ...string) error {
-	fmt.Printf("%s %s\n", cmd, strings.Join(args, " "))
+func (r *RealDependencies) executeXTables(cmd string, redirectStdout bool, args ...string) (err error) {
+	log.Infof("%s %s\n", cmd, strings.Join(args, " "))
+	if r.CNIMode {
+		originalCmd := cmd
+		cmd = constants.NSENTER
+		args = append([]string{fmt.Sprintf("--net=%v", r.NetworkNamespace), "--", originalCmd}, args...)
+	}
 	externalCommand := exec.Command(cmd, args...)
-	externalCommand.Stdout = os.Stdout
 
+	if r.CNIMode {
+		externalCommand.Stdout = os.Stderr
+	} else {
+		externalCommand.Stdout = os.Stdout
+	}
 	var stderr bytes.Buffer
 	// TODO Check naming and redirection logic
 	if !redirectStdout {
 		externalCommand.Stderr = &stderr
 	}
+	for i := 0; i < 1; i++ {
+		stderr.Reset()
+		err = externalCommand.Run()
+		// Command succeeded, or failed not because of xtables lock.
+		if !isXTablesLockError(stderr, err) {
+			break
+		}
 
-	err := externalCommand.Run()
+		// If command failed because xtables was locked, try the command again.
+		// Note we retry invoking iptables command explicitly instead of using the `-w` option of iptables,
+		// because as of iptables 1.6.0 (version shipped with bionic), iptables-restore does not support `-w`.
+		time.Sleep(100 * time.Millisecond)
+	}
 	// TODO Check naming and redirection logic
 	if err != nil && !redirectStdout {
 		stderrStr := stderr.String()
@@ -122,6 +156,33 @@ func transformToXTablesErrorMessage(stderr string, err error) string {
 	return stderr
 }
 
+func isXTablesLockError(stderr bytes.Buffer, err error) bool {
+	if err == nil {
+		return false
+	}
+
+	ee, ok := err.(*exec.ExitError)
+	if !ok {
+		// Not common, but can happen if file not found error, etc
+		return false
+	}
+
+	exitcode := ee.ExitCode()
+	// xtables lock acquire failure maps to resource problem exit code.
+	// https://git.netfilter.org/iptables/tree/iptables/iptables.c?h=v1.6.0#n1769
+	if exitcode != int(XTablesResourceProblem) {
+		return false
+	}
+
+	// check stderr output and see if there is `xtables lock` in it.
+	// https://git.netfilter.org/iptables/tree/iptables/iptables.c?h=v1.6.0#n1763
+	if strings.Contains(stderr.String(), "xtables lock") {
+		return true
+	}
+
+	return false
+}
+
 // RunOrFail runs a command and exits with an error message, if it fails
 func (r *RealDependencies) RunOrFail(cmd string, args ...string) {
 	var err error
@@ -131,7 +192,7 @@ func (r *RealDependencies) RunOrFail(cmd string, args ...string) {
 		err = r.execute(cmd, false, args...)
 	}
 	if err != nil {
-		fmt.Printf("Failed to execute: %s %s, %v\n", cmd, strings.Join(args, " "), err)
+		log.Infof("Failed to execute: %s %s, %v\n", cmd, strings.Join(args, " "), err)
 		os.Exit(-1)
 	}
 }
