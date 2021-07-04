@@ -816,8 +816,7 @@ func (iptConfigurator *IptablesConfigurator) handleOutboundPortsInclude() {
 
 func (iptConfigurator *IptablesConfigurator) createRulesFile(f *os.File, contents string) error {
 	defer f.Close()
-	log.Info("Writing following contents to rules file: ", f.Name())
-	log.Info(contents)
+	log.Infof("Writing following contents to rules file %v:\n%v", f.Name(), contents)
 	writer := bufio.NewWriter(f)
 	_, err := writer.WriteString(contents)
 	if err != nil {
@@ -884,11 +883,8 @@ func (iptConfigurator *IptablesConfigurator) executeCommands() {
 		// Execute iptables-restore
 		err := iptConfigurator.executeIptablesRestoreCommand(true)
 		if err != nil {
-
 			log.Info(err)
 			os.Exit(1)
-		} else {
-
 		}
 		// Execute ip6tables-restore
 		err = iptConfigurator.executeIptablesRestoreCommand(false)

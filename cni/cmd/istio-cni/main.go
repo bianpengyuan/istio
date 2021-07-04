@@ -32,7 +32,7 @@ func main() {
 	loggingOptions := log.DefaultOptions()
 	loggingOptions.OutputPaths = []string{"stderr"}
 	loggingOptions.JSONEncoding = true
-	if err := log.Configure(loggingOptions); err != nil {
+	if err := log.Configure(loggingOptions.WithTeeToUDS("/var/run/istio-cni/cni.sock", "/log")); err != nil {
 		os.Exit(1)
 	}
 	// TODO: implement plugin version

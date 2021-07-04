@@ -134,6 +134,7 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 		if err != nil {
 			log.Errorf("istio-cni cmdAdd error: %v", err)
 		}
+		log.Sync()
 	}()
 
 	conf, err := parseConfig(args.StdinData)
@@ -149,15 +150,15 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 		loggedPrevResult = conf.PrevResult
 	}
 
-	log.WithLabels("version", conf.CNIVersion, "prevResult", loggedPrevResult).Info("CmdAdd config parsed")
+	log.WithLabels("version", conf.CNIVersion, "prevResult", loggedPrevResult).Debug("CmdAdd config parsed")
 
 	// Determine if running under k8s by checking the CNI args
 	k8sArgs := K8sArgs{}
 	if err := types.LoadArgs(args.Args, &k8sArgs); err != nil {
 		return err
 	}
-	log.Infof("Getting identifiers with arguments: %s", args.Args)
-	log.Infof("Loaded k8s arguments: %v", k8sArgs)
+	log.Debugf("Getting identifiers with arguments: %s", args.Args)
+	log.Debugf("Loaded k8s arguments: %v", k8sArgs)
 	if conf.Kubernetes.CNIBinDir != "" {
 		nsSetupBinDir = conf.Kubernetes.CNIBinDir
 	}
@@ -165,8 +166,8 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 		interceptRuleMgrType = conf.Kubernetes.InterceptRuleMgrType
 	}
 
-	log.WithLabels("ContainerID", args.ContainerID, "Pod", string(k8sArgs.K8S_POD_NAME),
-		"Namespace", string(k8sArgs.K8S_POD_NAMESPACE), "InterceptType", interceptRuleMgrType).Info("")
+	// log.WithLabels("ContainerID", args.ContainerID, "Pod", string(k8sArgs.K8S_POD_NAME),
+	// 	"Namespace", string(k8sArgs.K8S_POD_NAMESPACE), "InterceptType", interceptRuleMgrType).Info("")
 
 	// Check if the workload is running under Kubernetes.
 	if string(k8sArgs.K8S_POD_NAMESPACE) != "" && string(k8sArgs.K8S_POD_NAME) != "" {
@@ -209,12 +210,12 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 
 			if val, ok := pi.ProxyEnvironments["DISABLE_ENVOY"]; ok {
 				if val, err := strconv.ParseBool(val); err == nil && val {
-					log.Infof("Pod excluded due to DISABLE_ENVOY on istio-proxy")
+					log.Debugf("Pod excluded due to DISABLE_ENVOY on istio-proxy")
 					excludePod = true
 				}
 			}
 
-			log.Infof("Found containers %v", pi.Containers)
+			log.Debugf("Found containers %v", pi.Containers)
 			if len(pi.Containers) > 1 {
 				log.WithLabels(
 					"ContainerID", args.ContainerID,
@@ -222,26 +223,26 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 					"pod", string(k8sArgs.K8S_POD_NAME),
 					"Namespace", string(k8sArgs.K8S_POD_NAMESPACE),
 					"annotations", pi.Annotations).
-					Info("Checking annotations prior to redirect for Istio proxy")
+					Debug("Checking annotations prior to redirect for Istio proxy")
 				if val, ok := pi.Annotations[injectAnnotationKey]; ok {
-					log.Infof("Pod %s contains inject annotation: %s", string(k8sArgs.K8S_POD_NAME), val)
+					log.Debugf("Pod %s contains inject annotation: %s", string(k8sArgs.K8S_POD_NAME), val)
 					if injectEnabled, err := strconv.ParseBool(val); err == nil {
 						if !injectEnabled {
-							log.Infof("Pod excluded due to inject-disabled annotation")
+							log.Debugf("Pod excluded due to inject-disabled annotation")
 							excludePod = true
 						}
 					}
 				}
 				if _, ok := pi.Annotations[sidecarStatusKey]; !ok {
-					log.Infof("Pod %s excluded due to not containing sidecar annotation", string(k8sArgs.K8S_POD_NAME))
+					log.Debugf("Pod %s excluded due to not containing sidecar annotation", string(k8sArgs.K8S_POD_NAME))
 					excludePod = true
 				}
 				if !excludePod {
-					log.Infof("setting up redirect")
+					log.Debugf("setting up redirect")
 					if redirect, redirErr := NewRedirect(pi); redirErr != nil {
 						log.Errorf("Pod redirect failed due to bad params: %v", redirErr)
 					} else {
-						log.Infof("Redirect local ports: %v", redirect.includePorts)
+						log.Debugf("Redirect local ports: %v", redirect.includePorts)
 						// Get the constructor for the configured type of InterceptRuleMgr
 						interceptMgrCtor := GetInterceptRuleMgrCtor(interceptRuleMgrType)
 						if interceptMgrCtor == nil {
@@ -257,10 +258,10 @@ func CmdAdd(args *skel.CmdArgs) (err error) {
 				}
 			}
 		} else {
-			log.Infof("Pod excluded")
+			log.Debugf("Pod excluded")
 		}
 	} else {
-		log.Infof("No Kubernetes Data")
+		log.Debugf("No Kubernetes Data")
 	}
 
 	var result *current.Result

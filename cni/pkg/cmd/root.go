@@ -26,6 +26,7 @@ import (
 	"istio.io/istio/cni/pkg/config"
 	"istio.io/istio/cni/pkg/constants"
 	"istio.io/istio/cni/pkg/install"
+	"istio.io/istio/cni/pkg/logging"
 	"istio.io/istio/cni/pkg/monitoring"
 	"istio.io/istio/cni/pkg/repair"
 	iptables "istio.io/istio/tools/istio-iptables/pkg/constants"
@@ -49,6 +50,10 @@ var rootCmd = &cobra.Command{
 
 		// Start metrics server
 		monitoring.SetupMonitoring(":"+constants.MonitoringPort, "/metrics", ctx.Done())
+		if err = logging.StartUDSLogServer("/var/run/istio-cni/cni.sock", ctx.Done()); err != nil {
+			log.Errorf("Failed to start up UDS Log Server: %v", err)
+			return
+		}
 
 		isReady := install.StartServer()
 

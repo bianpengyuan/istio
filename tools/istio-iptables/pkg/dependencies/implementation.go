@@ -59,6 +59,7 @@ var XTablesCmds = sets.NewSet(
 	constants.IP6TABLESRESTORE,
 	constants.IPTABLESSAVE,
 	constants.IP6TABLESSAVE,
+	constants.NSENTER,
 )
 
 // RealDependencies implementation of interface Dependencies, which is used in production
@@ -88,7 +89,30 @@ func (r *RealDependencies) execute(cmd string, redirectStdout bool, args ...stri
 }
 
 func (r *RealDependencies) executeXTables(cmd string, redirectStdout bool, args ...string) (err error) {
-	log.Infof("%s %s\n", cmd, strings.Join(args, " "))
+	log.Infof("Run command: %s %s\n", cmd, strings.Join(args, " "))
+
+	// Xtables lock experiment
+	// fileLock := flock.New("/run/xtables.lock")
+	// locked, err := fileLock.TryLock()
+	// if err != nil {
+	// 	log.Infof("error try lock %v", err)
+	// } else if locked {
+	// 	log.Info("lock successfully")
+	// } else {
+	// 	log.Info("failed to lock")
+	// }
+
+	// defer func() {
+	// 	if locked {
+	// 		// do work
+	// 		fileLock.Unlock()
+	// 	}
+	// }()
+
+	// if err != nil {
+	// 	// handle locking error
+	// }
+
 	if r.CNIMode {
 		originalCmd := cmd
 		cmd = constants.NSENTER
@@ -150,7 +174,12 @@ func transformToXTablesErrorMessage(stderr string, err error) string {
 		// `Try 'iptables -h' or 'iptables --help' for more information.`
 		// Reusing the `error hints` and optional `try help information` parts of the original stderr to form
 		// an error message with explicit xtables error information.
-		return fmt.Sprintf("%v: %v", errtypeStr, strings.Trim(strings.SplitN(stderr, ":", 2)[1], " "))
+		errStrs := strings.SplitN(stderr, ":", 2)
+		printErr := strings.TrimSpace(stderr)
+		if len(errStrs) > 1 {
+			printErr = strings.TrimSpace(errStrs[1])
+		}
+		return fmt.Sprintf("%v: %v", errtypeStr, printErr)
 	}
 
 	return stderr

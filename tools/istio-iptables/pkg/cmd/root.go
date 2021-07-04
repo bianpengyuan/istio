@@ -47,6 +47,8 @@ var rootCmd = &cobra.Command{
 	Long:   "istio-iptables is responsible for setting up port forwarding for Istio Sidecar.",
 	PreRun: bindFlags,
 	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: separate out run to a function which returns error
+		// TODO: separate out viper default value set out from flag binding.
 		cfg := constructConfig()
 		var ext dep.Dependencies
 		if cfg.DryRun {
