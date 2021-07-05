@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofrs/flock"
 	"istio.io/istio/pilot/pkg/util/sets"
 	"istio.io/istio/tools/istio-iptables/pkg/constants"
 	"istio.io/pkg/log"
@@ -79,6 +80,28 @@ func (r *RealDependencies) executeXTables(cmd string, redirectStdout bool, args 
 	log.Infof("%s %s", cmd, strings.Join(args, " "))
 	externalCommand := exec.Command(cmd, args...)
 	externalCommand.Stdout = os.Stdout
+
+	// Xtables lock experiment
+	fileLock := flock.New("/run/xtables.lock")
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		log.Infof("error try lock %v", err)
+	} else if locked {
+		log.Info("lock successfully")
+	} else {
+		log.Info("failed to lock")
+	}
+
+	defer func() {
+		if locked {
+			// do work
+			fileLock.Unlock()
+		}
+	}()
+
+	if err != nil {
+		// handle locking error
+	}
 
 	var stderr bytes.Buffer
 	// TODO Check naming and redirection logic
